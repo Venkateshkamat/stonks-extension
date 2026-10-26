@@ -1,25 +1,75 @@
 {
   "name": "stonks-watch",
   "displayName": "Stonks Watch: Stocks & Crypto",
-  "description": "Watch your stock and crypto holdings: profit/loss in the status bar and a portfolio panel.",
+  "description": "Track NSE, BSE, US stock and crypto holdings: profit/loss in the status bar, a portfolio panel and market heatmaps.",
   "version": "1.0.0",
   "publisher": "venkateshkamat",
   "icon": "media/icon.png",
+  "author": "Venkatesh Kamat",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Venkateshkamat/stonks-extension.git"
   },
+  "homepage": "https://github.com/Venkateshkamat/stonks-extension#readme",
+  "bugs": {
+    "url": "https://github.com/Venkateshkamat/stonks-extension/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
+  "keywords": [
+    "stocks",
+    "stock market",
+    "crypto",
+    "cryptocurrency",
+    "bitcoin",
+    "portfolio",
+    "portfolio tracker",
+    "nse",
+    "bse",
+    "nifty",
+    "sensex",
+    "s&p 500",
+    "nasdaq",
+    "finance",
+    "ticker",
+    "stock ticker",
+    "status bar",
+    "heatmap",
+    "watchlist",
+    "profit and loss",
+    "investing",
+    "cursor"
+  ],
+  "galleryBanner": {
+    "color": "#0d1117",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
+  "files": [
+    "dist/extension.js",
+    "dist/media/chart.umd.min.js",
+    "dist/media/panel.css",
+    "dist/media/panel.js",
+    "media/icon.png",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "contributes": {
     "commands": [
       {
@@ -121,11 +171,8 @@
     "test:integration": "npm run compile && npm run build:tests && node out/test/integration/runTest.js vscode",
     "test:integration:cursor": "npm run compile && npm run build:tests && node out/test/integration/runTest.js cursor",
     "vscode:prepublish": "npm run package",
-    "vsix": "vsce package --no-dependencies --out stonks.vsix",
+    "vsix": "vsce package",
     "icon": "node scripts/make-icon.js"
-  },
-  "dependencies": {
-    "chart.js": "^4.6.1"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -133,8 +180,11 @@
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
+    "chart.js": "^4.6.1",
     "esbuild": "^0.28.2",
     "mocha": "^12.0.3",
-    "typescript": "^7.0.2"
+    "ovsx": "^1.3.0",
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
   }
 }
