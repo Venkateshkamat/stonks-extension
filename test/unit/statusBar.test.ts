@@ -44,6 +44,21 @@ describe('buildStatusBarModel', () => {
     assert.ok(m.tooltip.includes('Today: +0.46%'));
   });
 
+  it('says in the tooltip when the markets behind the figures are closed, and not while they are open', async () => {
+    const tooltipAt = async (iso: string, holdings: Array<[string, 'NSE' | 'US' | 'CRYPTO']>) => {
+      const { store, controller } = setup({ now: Date.parse(iso) });
+      for (const [symbol, market] of holdings) await store.add({ symbol, market, quantity: 1, buyPrice: 1 });
+      await controller.refresh();
+      const tip = buildStatusBarModel(controller.snapshot).tooltip;
+      controller.dispose();
+      return tip;
+    };
+    assert.match(await tooltipAt('2026-10-27T11:00:00Z', [['RELIANCE', 'NSE']]), /Market closed: India - showing the last close/);
+    assert.doesNotMatch(await tooltipAt('2026-10-27T05:00:00Z', [['RELIANCE', 'NSE']]), /Market closed/);
+    assert.match(await tooltipAt('2026-10-27T05:00:00Z', [['RELIANCE', 'NSE'], ['AAPL', 'US']]), /Market closed: US - /);
+    assert.doesNotMatch(await tooltipAt('2026-10-24T05:00:00Z', [['BTC', 'CRYPTO']]), /Market closed/, 'crypto never closes');
+  });
+
   it('uses loss tone for negative P/L', async () => {
     const { store, controller } = setup();
     await store.add({ symbol: 'RELIANCE', market: 'NSE', quantity: 10, buyPrice: 2000 });

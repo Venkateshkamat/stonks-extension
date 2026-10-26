@@ -60,8 +60,10 @@ export interface PortfolioSnapshot {
   fxStale: boolean;
   baseCurrency: Currency;
   hideAmounts: boolean;
-  /** Epoch ms of the last completed refresh. */
+  /** Epoch ms of the newest quote behind the figures (not "now": closed markets are not refreshed). */
   lastUpdated?: number;
+  /** Stock markets with holdings that are closed at the moment, so the figures are last-close values. */
+  closedMarkets: ClosedMarket[];
   /** True while a refresh is in flight. */
   loading: boolean;
   errors: SnapshotError[];
@@ -94,7 +96,11 @@ export interface FetchedData {
   pinnedMarkets?: IndexResult[];
   finnhubIssue?: string;
   lastUpdated?: number;
+  /** Stock markets with holdings that are closed right now (their last close is what is shown). */
+  closedMarkets?: ClosedMarket[];
 }
+
+export type ClosedMarket = 'India' | 'US';
 
 const FINNHUB_MESSAGES = {
   rejected: 'Finnhub API key was rejected; using Yahoo Finance instead.',
@@ -153,6 +159,7 @@ export function buildSnapshot(
     baseCurrency: settings.baseCurrency,
     hideAmounts: settings.hideAmounts,
     lastUpdated: data.lastUpdated,
+    closedMarkets: data.closedMarkets ?? [],
     loading,
     errors,
     sources,
@@ -532,7 +539,11 @@ export class PortfolioController implements Disposable {
     const pinnedMarkets = this.pinnedMarketDefs().map(result);
     let lastUpdated: number | undefined;
     for (const e of used) if (e.at !== undefined && (lastUpdated === undefined || e.at > lastUpdated)) lastUpdated = e.at;
-    return { quotes, quoteErrors, fx, fxError, indices, coins, pinnedMarkets, finnhubIssue: this.finnhubIssue, lastUpdated: lastUpdated ?? this.lastAttemptAt };
+    const now = this.now();
+    const closedMarkets: ClosedMarket[] = [];
+    if (holdings.some((h) => clockForMarket(h.market) === 'IN') && !sessionAt('IN', now).open) closedMarkets.push('India');
+    if (holdings.some((h) => h.market === 'US') && !sessionAt('US', now).open) closedMarkets.push('US');
+    return { quotes, quoteErrors, fx, fxError, indices, coins, pinnedMarkets, finnhubIssue: this.finnhubIssue, lastUpdated: lastUpdated ?? this.lastAttemptAt, closedMarkets };
   }
 
   private rebuild(loading = this.running !== undefined): void {

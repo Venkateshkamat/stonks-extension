@@ -72,6 +72,7 @@ export function buildStatusBarModel(s: PortfolioSnapshot): StatusBarModel {
   );
   if (!s.hideAmounts) lines.push(...amountLines(t));
   if (t.skipped > 0) lines.push(`${t.skipped} holding(s) excluded (no quote or FX rate)`);
+  if (s.closedMarkets.length > 0) lines.push(`Market closed: ${s.closedMarkets.join(', ')} - showing the last close`);
   const updated = s.lastUpdated !== undefined ? new Date(s.lastUpdated).toLocaleTimeString() : 'n/a';
   lines.push(`Updated ${updated} - Data: ${s.dataSource}`);
   if (s.errors.length > 0) lines.push(`Warning: ${s.errors.length} issue(s) - ${s.errors[0].label}: ${s.errors[0].message}`);
