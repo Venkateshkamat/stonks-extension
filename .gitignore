@@ -1,0 +1,15 @@
+# Local agent instructions
+CLAUDE.md
+
+# Dependencies and build output
+node_modules/
+out/
+dist/
+*.vsix
+
+# VS Code test downloads
+.vscode-test/
+
+# OS / editor
+.DS_Store
+*.log

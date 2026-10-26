@@ -1,0 +1,111 @@
+{
+  "name": "stonks",
+  "displayName": "Stonks",
+  "description": "Watch your stock and crypto holdings: profit/loss in the status bar and a portfolio panel.",
+  "version": "0.0.1",
+  "publisher": "venkateshkamat",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Venkateshkamat/stonks-extension.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "stonks.openPortfolio",
+        "title": "Open Portfolio",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.addHolding",
+        "title": "Add Holding",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.editHolding",
+        "title": "Edit Holding",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.removeHolding",
+        "title": "Remove Holding",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.toggleHideAmounts",
+        "title": "Toggle Hide Amounts",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.refresh",
+        "title": "Refresh",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.setFinnhubApiKey",
+        "title": "Set Finnhub API Key",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.clearFinnhubApiKey",
+        "title": "Clear Finnhub API Key",
+        "category": "Stonks"
+      }
+    ],
+    "configuration": {
+      "title": "Stonks",
+      "properties": {
+        "stonks.baseCurrency": {
+          "type": "string",
+          "enum": [
+            "INR",
+            "USD"
+          ],
+          "default": "INR",
+          "description": "Currency used for portfolio totals (status bar, header totals, chart). Converted with the live USDINR rate."
+        },
+        "stonks.refreshIntervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15,
+          "description": "How often quotes are refreshed, in seconds (minimum 15)."
+        },
+        "stonks.hideAmounts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Hide quantities, prices and amounts; only percentages are shown."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "compile": "tsc --noEmit && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "tsc --noEmit && node esbuild.js --production",
+    "build:tests": "tsc -p tsconfig.json --outDir out --noEmit false",
+    "test": "npm run build:tests && mocha",
+    "test:live": "npm run build:tests && node out/test/live/smoke.js"
+  },
+  "dependencies": {
+    "chart.js": "^4.6.1"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.43",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.2",
+    "mocha": "^12.0.3",
+    "typescript": "^7.0.2"
+  }
+}
