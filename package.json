@@ -4,6 +4,7 @@
   "description": "Watch your stock and crypto holdings: profit/loss in the status bar and a portfolio panel.",
   "version": "1.0.0",
   "publisher": "venkateshkamat",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -120,7 +121,8 @@
     "test:integration": "npm run compile && npm run build:tests && node out/test/integration/runTest.js vscode",
     "test:integration:cursor": "npm run compile && npm run build:tests && node out/test/integration/runTest.js cursor",
     "vscode:prepublish": "npm run package",
-    "vsix": "vsce package --no-dependencies --skip-license --out stonks.vsix"
+    "vsix": "vsce package --no-dependencies --skip-license --out stonks.vsix",
+    "icon": "node scripts/make-icon.js"
   },
   "dependencies": {
     "chart.js": "^4.6.1"

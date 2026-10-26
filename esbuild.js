@@ -11,11 +11,12 @@ function copyMedia() {
   fs.mkdirSync(mediaDir, { recursive: true });
   const chartSrc = path.join(__dirname, 'node_modules', 'chart.js', 'dist', 'chart.umd.min.js');
   fs.copyFileSync(chartSrc, path.join(mediaDir, 'chart.umd.min.js'));
-  // Static webview assets (added in a later phase) live in ./media.
+  // Static webview assets live in ./media. Only .css/.js are copied: the icon and README screenshots in the same
+  // folder are not used by the webview.
   const own = path.join(__dirname, 'media');
   if (fs.existsSync(own)) {
     for (const f of fs.readdirSync(own)) {
-      fs.copyFileSync(path.join(own, f), path.join(mediaDir, f));
+      if (/\.(css|js)$/.test(f)) fs.copyFileSync(path.join(own, f), path.join(mediaDir, f));
     }
   }
 }
