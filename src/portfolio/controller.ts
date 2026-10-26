@@ -2,6 +2,7 @@ import { ChartRange, COINS, Currency, DEFAULT_CHART_RANGE, findMarketDef, Holdin
 import { marketGroup, nativeCurrency, normalizeSymbol, PORTFOLIO_GROUPS, PortfolioGroup } from '../symbols';
 import { errorMessage, mapSettled } from '../util/async';
 import { Disposable, Emitter, Event } from '../util/emitter';
+import { ALWAYS_FOCUSED, FocusSource } from '../util/focus';
 import { IndexResult, MarketDataService, sourceLabel } from '../market/marketData';
 import { MarketClock, MS_MIN, sessionAt } from '../market/hours';
 import { clockForIndex, clockForMarket, MAX_SLEEP_MS, nextDueAt, refreshIntervalMs } from '../market/schedule';
@@ -78,7 +79,7 @@ export interface HistorySeries {
   errors: string[];
 }
 
-export type RefreshReason = 'start' | 'timer' | 'manual' | 'holdings' | 'settings' | 'key';
+export type RefreshReason = 'start' | 'timer' | 'manual' | 'holdings' | 'settings' | 'key' | 'focus';
 
 export interface FetchedData {
   quotes: Map<string, Quote>; // by holding id
@@ -165,6 +166,8 @@ export interface ControllerDeps {
   /** Pinned tickers; their quotes are fetched like the holdings' (index pins even when the panel is closed). */
   pins?: PinStore;
   now?: () => number;
+  /** Whether the editor window is focused; refreshes are five times less frequent while it is not. Default: always focused. */
+  focus?: FocusSource;
   /** Random source for wake-up jitter (so several windows do not all fetch at the same instant). Default Math.random. */
   random?: () => number;
 }
@@ -224,16 +227,19 @@ export class PortfolioController implements Disposable {
   private disposed = false;
   private readonly now: () => number;
   private readonly random: () => number;
+  private readonly focus: FocusSource;
   private readonly subscriptions: Disposable[] = [];
 
   constructor(private readonly deps: ControllerDeps) {
     this.now = deps.now ?? Date.now;
     this.random = deps.random ?? Math.random;
+    this.focus = deps.focus ?? ALWAYS_FOCUSED;
     this.settings = deps.settings.get();
     this.pins = deps.pins?.list() ?? [];
     this.current = buildSnapshot(deps.store.list(), this.buildData(), this.settings, false, this.pins);
     this.subscriptions.push(deps.store.onDidChange(() => this.onHoldingsChanged()));
     if (deps.pins) this.subscriptions.push(deps.pins.onDidChange(() => this.onPinsChanged()));
+    this.subscriptions.push(this.focus.onDidChange((focused) => this.onFocusChanged(focused)));
   }
 
   /** Latest computed snapshot. */
@@ -400,6 +406,11 @@ export class PortfolioController implements Disposable {
     void this.refresh('holdings');
   }
 
+  private onFocusChanged(focused: boolean): void {
+    if (focused) void this.refresh('focus'); // fetches whatever went stale at the normal pace while unfocused
+    else this.schedule(); // lengthen the pending wake-up
+  }
+
   private onPinsChanged(): void {
     const before = this.pinnedMarketDefs().map((d) => d.symbol).join(',');
     this.pins = this.deps.pins?.list() ?? [];
@@ -441,7 +452,7 @@ export class PortfolioController implements Disposable {
   }
 
   private intervalMs(clock: MarketClock): number {
-    return refreshIntervalMs(clock, this.settings.refreshIntervalSeconds, true);
+    return refreshIntervalMs(clock, this.settings.refreshIntervalSeconds, this.focus.focused);
   }
 
   /** When this quote should next be fetched (<= now means due). */

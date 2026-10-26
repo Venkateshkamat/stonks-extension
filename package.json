@@ -98,7 +98,7 @@
           "type": "number",
           "default": 60,
           "minimum": 15,
-          "description": "How often quotes are refreshed, in seconds (minimum 15)."
+          "description": "How often quotes are refreshed, in seconds (minimum 15). Closed markets are not refreshed, and a window that is not focused refreshes 5 times less often."
         },
         "stonks.hideAmounts": {
           "type": "boolean",

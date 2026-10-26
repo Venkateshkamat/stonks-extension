@@ -9,6 +9,7 @@ import { PanelPrefs } from './panel/prefs';
 import { PortfolioPanel } from './ui/portfolioPanel';
 import { StatusBarController } from './ui/statusBar';
 import { VsCodeSettings } from './ui/vscodeSettings';
+import { WindowFocus } from './ui/windowFocus';
 import { StonksTestApi } from './testApi';
 
 export async function activate(context: vscode.ExtensionContext): Promise<StonksTestApi | undefined> {
@@ -25,12 +26,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
 
   const store = new HoldingsStore(context.globalState);
   const pins = new PinStore(context.globalState);
-  const controller = new PortfolioController({ store, market, settings: new VsCodeSettings(), pins });
+  const focus = new WindowFocus();
+  const controller = new PortfolioController({ store, market, settings: new VsCodeSettings(), pins, focus });
   const statusBar = new StatusBarController(controller);
   const panel = new PortfolioPanel(context.extensionUri, controller, new PanelPrefs(context.globalState));
 
   context.subscriptions.push(
     keys,
+    focus,
     controller,
     statusBar,
     panel,
