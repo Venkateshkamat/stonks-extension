@@ -117,7 +117,10 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       for (const r of snap.holdings) assert.ok(r.quote!.price > 0, `${r.holding.symbol} has no positive price`);
       assert.deepStrictEqual(snap.sources, ['yahoo'], 'without a Finnhub key every quote should come from Yahoo');
       assert.ok(snap.totals, 'expected portfolio totals');
-      assert.match(api.statusBar.text, /^\$\(graph\) [+-]?\d+\.\d{2}%$/, `unexpected status bar text: ${api.statusBar.text}`);
+      assert.match(api.statusBar.text, /^\$\(graph\) Stocks [+-]?\d+\.\d{2}% \| Crypto [+-]?\d+\.\d{2}%$/, `unexpected status bar text: ${api.statusBar.text}`);
+      assert.match(api.statusBar.tooltip, /Stocks: P\/L [+-]?\d+\.\d{2}%/);
+      assert.match(api.statusBar.tooltip, /Crypto: P\/L [+-]?\d+\.\d{2}%/);
+      assert.match(api.statusBar.tooltip, /Overall:/);
       assert.match(api.statusBar.tooltip, /Yahoo Finance/);
       assert.match(api.statusBar.tooltip, /Value:/);
     });
@@ -225,6 +228,18 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       await waitFor('panel reopened', () => webviewTabs().length === 1);
       await waitFor('webview ready after reopen', () => api.panel.diagnostics.ready, 20_000);
       assert.deepStrictEqual(api.panel.diagnostics.errors, []);
+    });
+
+    it('shows a single number once only stocks (or only crypto) remain', async function () {
+      this.timeout(NETWORK_TIMEOUT);
+      const isBtc = (h: { symbol: string }) => h.symbol === 'BTC';
+      const btc = api.store.list().filter(isBtc);
+      await api.store.remove(btc[0].id);
+      await waitFor('stocks-only text', () => /^\$\(graph\) [+-]?\d+\.\d{2}%$/.test(api.statusBar.text), NETWORK_TIMEOUT);
+      assert.ok(!/Crypto:/.test(api.statusBar.tooltip));
+      for (const h of api.store.list().filter((x) => !isBtc(x))) await api.store.remove(h.id);
+      await api.store.add({ symbol: 'BTC', market: 'CRYPTO', quantity: 1, buyPrice: 10_000 });
+      await waitFor('crypto-only text', () => /^\$\(graph\) Crypto [+-]?\d+\.\d{2}%$/.test(api.statusBar.text), NETWORK_TIMEOUT);
     });
 
     it('returns to the idle status bar once the holdings are removed', async () => {

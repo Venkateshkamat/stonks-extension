@@ -1,5 +1,7 @@
 import { formatMoney, formatPercent, formatSignedMoney } from './format';
-import { PortfolioSnapshot } from './portfolio/controller';
+import { GroupSummary, PortfolioSnapshot } from './portfolio/controller';
+import { PortfolioTotals } from './portfolio/calc';
+import { PortfolioGroup } from './symbols';
 
 export type Tone = 'gain' | 'loss' | 'neutral' | 'warning';
 
@@ -9,7 +11,35 @@ export interface StatusBarModel {
   tone: Tone;
 }
 
-/** Pure presentation logic for the status bar item; unit-tested without VS Code. */
+const GROUP_LABEL: Record<PortfolioGroup, string> = { stocks: 'Stocks', crypto: 'Crypto' };
+
+/** Gain / loss as displayed (percent rounded to 2 decimals, so +0.00% is neutral). */
+export function percentTone(p: number): Tone {
+  const rounded = Math.round(p * 100) / 100;
+  return rounded > 0 ? 'gain' : rounded < 0 ? 'loss' : 'neutral';
+}
+
+function amountLines(t: PortfolioTotals, indent = ''): string[] {
+  return [`${indent}Value: ${formatMoney(t.current, t.currency)}`, `${indent}Invested: ${formatMoney(t.invested, t.currency)}`, `${indent}P/L: ${formatSignedMoney(t.pnl, t.currency)}`];
+}
+
+function groupTooltipLines(g: GroupSummary, hide: boolean): string[] {
+  const label = GROUP_LABEL[g.group];
+  const t = g.totals;
+  if (!t) return [`${label}: no quotes yet`];
+  const today = hide ? formatPercent(t.dayChangePercent) : `${formatPercent(t.dayChangePercent)} (${formatSignedMoney(t.dayChange, t.currency)})`;
+  const lines = [`${label}: P/L ${formatPercent(t.pnlPercent)} | Today ${today}`];
+  if (!hide) lines.push(...amountLines(t, '  '));
+  return lines;
+}
+
+/**
+ * Pure presentation logic for the main status bar item; unit-tested without VS Code.
+ *
+ * Text: with both stocks and crypto holdings, `$(graph) Stocks +4.21% | Crypto -1.30%` (each group's total P/L %
+ * in the base currency); with stocks only `$(graph) +4.21%`; with crypto only `$(graph) Crypto -1.30%`.
+ * Colour: green when both numbers are up, red when both are down, default otherwise; a single number as before.
+ */
 export function buildStatusBarModel(s: PortfolioSnapshot): StatusBarModel {
   if (!s.hasHoldings) {
     return { text: '$(graph) Stonks', tooltip: 'Stonks\nAdd holdings to track your profit/loss.\nClick to open.', tone: 'neutral' };
@@ -27,25 +57,33 @@ export function buildStatusBarModel(s: PortfolioSnapshot): StatusBarModel {
     };
   }
 
+  const both = s.groups.length > 1;
   const lines: string[] = ['Stonks - Portfolio'];
+  if (both) {
+    for (const g of s.groups) lines.push(...groupTooltipLines(g, s.hideAmounts));
+    lines.push('Overall:');
+  }
   lines.push(`Total P/L: ${formatPercent(t.pnlPercent)}`);
   lines.push(
     s.hideAmounts
       ? `Today: ${formatPercent(t.dayChangePercent)}`
       : `Today: ${formatPercent(t.dayChangePercent)} (${formatSignedMoney(t.dayChange, t.currency)})`,
   );
-  if (!s.hideAmounts) {
-    lines.push(`Value: ${formatMoney(t.current, t.currency)}`);
-    lines.push(`Invested: ${formatMoney(t.invested, t.currency)}`);
-    lines.push(`P/L: ${formatSignedMoney(t.pnl, t.currency)}`);
-  }
+  if (!s.hideAmounts) lines.push(...amountLines(t));
   if (t.skipped > 0) lines.push(`${t.skipped} holding(s) excluded (no quote or FX rate)`);
   const updated = s.lastUpdated !== undefined ? new Date(s.lastUpdated).toLocaleTimeString() : 'n/a';
   lines.push(`Updated ${updated} - Data: ${s.dataSource}`);
   if (s.errors.length > 0) lines.push(`Warning: ${s.errors.length} issue(s) - ${s.errors[0].label}: ${s.errors[0].message}`);
   lines.push('Click to open portfolio.');
 
-  const rounded = Math.round(t.pnlPercent * 100) / 100;
-  const tone: Tone = rounded > 0 ? 'gain' : rounded < 0 ? 'loss' : 'neutral';
-  return { text: `$(graph) ${formatPercent(t.pnlPercent)}`, tooltip: lines.join('\n'), tone };
+  if (both) {
+    const parts = s.groups.map((g) => `${GROUP_LABEL[g.group]} ${g.totals ? formatPercent(g.totals.pnlPercent) : '--'}`);
+    const tones = s.groups.map((g) => (g.totals ? percentTone(g.totals.pnlPercent) : 'neutral'));
+    const tone: Tone = tones.every((x) => x === 'gain') ? 'gain' : tones.every((x) => x === 'loss') ? 'loss' : 'neutral';
+    return { text: `$(graph) ${parts.join(' | ')}`, tooltip: lines.join('\n'), tone };
+  }
+  // A single kind of holding: show just that number (labelled when it is crypto, as before for stocks).
+  const only = s.groups[0]?.group;
+  const label = only === 'crypto' ? 'Crypto ' : '';
+  return { text: `$(graph) ${label}${formatPercent(t.pnlPercent)}`, tooltip: lines.join('\n'), tone: percentTone(t.pnlPercent) };
 }

@@ -1,5 +1,5 @@
 import { ChartRange, Currency, DEFAULT_CHART_RANGE, Holding, IntradayPoint, ProviderId, Quote } from '../types';
-import { marketGroup, nativeCurrency, PortfolioGroup } from '../symbols';
+import { marketGroup, nativeCurrency, PORTFOLIO_GROUPS, PortfolioGroup } from '../symbols';
 import { errorMessage, mapSettled } from '../util/async';
 import { Disposable, Emitter, Event } from '../util/emitter';
 import { IndexResult, MarketDataService, sourceLabel } from '../market/marketData';
@@ -18,6 +18,15 @@ export interface HoldingRow {
   error?: string;
 }
 
+/** Totals for one portfolio group (stocks or crypto), in the base currency. Only groups that have holdings are listed. */
+export interface GroupSummary {
+  group: PortfolioGroup;
+  /** Number of holdings (lots) in the group. */
+  holdings: number;
+  /** Undefined while none of the group's holdings has a quote (or a needed FX rate). */
+  totals?: PortfolioTotals;
+}
+
 export interface SnapshotError {
   scope: 'holding' | 'fx' | 'index' | 'finnhub';
   /** Holding id for scope 'holding'. */
@@ -33,6 +42,8 @@ export interface PortfolioSnapshot {
   hasHoldings: boolean;
   /** Totals in `baseCurrency`; undefined when there are no priced holdings. */
   totals?: PortfolioTotals;
+  /** Per-group totals (stocks = NSE/BSE/US, crypto), in `stocks`, `crypto` order; groups without holdings are omitted. */
+  groups: GroupSummary[];
   /** Index quotes; empty unless indices were requested via setIncludeIndices(true). */
   indices: IndexResult[];
   /** USD -> INR; undefined if never fetched / not needed. */
@@ -114,6 +125,12 @@ export function buildSnapshot(
     holdings: rows,
     hasHoldings: holdings.length > 0,
     totals: priced.length > 0 ? computeTotals(rows, settings.baseCurrency, data.fx?.rate) : undefined,
+    groups: PORTFOLIO_GROUPS.flatMap((group): GroupSummary[] => {
+      const inGroup = rows.filter((r) => marketGroup(r.holding.market) === group);
+      if (inGroup.length === 0) return [];
+      const hasQuote = inGroup.some((r) => r.pnl);
+      return [{ group, holdings: inGroup.length, totals: hasQuote ? computeTotals(inGroup, settings.baseCurrency, data.fx?.rate) : undefined }];
+    }),
     indices: data.indices,
     fxRate: data.fx?.rate,
     fxStale: data.fx?.stale ?? false,
