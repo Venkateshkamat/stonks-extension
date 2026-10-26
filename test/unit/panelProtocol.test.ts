@@ -11,6 +11,15 @@ describe('parseWebviewMessage', () => {
     }
   });
 
+  it('accepts diag and error reports from the webview, normalising their fields', () => {
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 'boom' }), { type: 'error', message: 'boom' });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 42 }), { type: 'error', message: 'unknown error' });
+    const long = parseWebviewMessage({ type: 'error', message: 'x'.repeat(5000) });
+    assert.ok(long?.type === 'error' && long.message.length === 500);
+  });
+
   it('requires a string id for edit / remove', () => {
     assert.deepStrictEqual(parseWebviewMessage({ type: 'action', action: 'edit', id: 'abc' }), { type: 'action', action: 'edit', id: 'abc' });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'action', action: 'remove', id: 'abc', extra: 1 }), { type: 'action', action: 'remove', id: 'abc' });

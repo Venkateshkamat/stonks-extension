@@ -15,6 +15,20 @@ const ACTION_COMMANDS = {
   remove: 'stonks.removeHolding',
 } as const;
 
+/** What the webview has reported about itself; used by the integration tests and for surfacing webview errors. */
+export interface PanelDiagnostics {
+  /** True once the webview posted `ready` (its script loaded and ran under the CSP). */
+  ready: boolean;
+  /** Whether Chart.js was defined in the webview (last report). */
+  chartLib?: boolean;
+  /** Whether a chart was drawn (last report). */
+  chartRendered?: boolean;
+  /** Number of holding rows currently drawn in the table (last report). */
+  holdingRows?: number;
+  /** Uncaught errors / unhandled rejections reported by the webview. */
+  errors: string[];
+}
+
 /**
  * Singleton webview panel showing the portfolio table, 30-day chart and indices.
  * The extension posts a pre-formatted view model; the webview only renders it and posts back actions.
@@ -26,11 +40,22 @@ export class PortfolioPanel implements vscode.Disposable {
   private histKey?: string;
   private chart?: ChartModel;
   private histSeq = 0;
+  private diag: PanelDiagnostics = { ready: false, errors: [] };
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly controller: PortfolioController,
   ) {}
+
+  /** True while the panel is open. */
+  get isOpen(): boolean {
+    return this.panel !== undefined;
+  }
+
+  /** Snapshot of the webview's self-reported health (reset each time the panel is opened). */
+  get diagnostics(): PanelDiagnostics {
+    return { ...this.diag, errors: [...this.diag.errors] };
+  }
 
   /** Opens the panel, or reveals it if it is already open. */
   show(): void {
@@ -44,6 +69,7 @@ export class PortfolioPanel implements vscode.Disposable {
       localResourceRoots: [mediaRoot],
     });
     this.panel = panel;
+    this.diag = { ready: false, errors: [] };
     const webview = panel.webview;
     const uri = (file: string) => webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, file)).toString();
     webview.html = buildHtml({
@@ -70,7 +96,19 @@ export class PortfolioPanel implements vscode.Disposable {
 
   private async onMessage(msg: FromWebview | undefined): Promise<void> {
     if (!msg) return;
+    if (msg.type === 'diag') {
+      this.diag.chartLib = msg.chartLib;
+      this.diag.chartRendered = msg.chartRendered;
+      this.diag.holdingRows = msg.holdingRows;
+      return;
+    }
+    if (msg.type === 'error') {
+      console.error(`[stonks] webview error: ${msg.message}`);
+      if (this.diag.errors.length < 20) this.diag.errors.push(msg.message);
+      return;
+    }
     if (msg.type === 'ready') {
+      this.diag.ready = true;
       // A (re)loaded webview starts empty: send everything again.
       const s = this.controller.snapshot;
       this.post({ type: 'state', model: buildPanelModel(s) });

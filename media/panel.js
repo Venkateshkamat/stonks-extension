@@ -3,6 +3,30 @@
 (function () {
   'use strict';
   var vscode = acquireVsCodeApi();
+
+  // Forward uncaught errors to the extension so they are visible (the webview devtools are easy to miss).
+  function reportError(message) {
+    try {
+      vscode.postMessage({ type: 'error', message: String(message) });
+    } catch (e) {
+      /* nothing else to do */
+    }
+  }
+  window.addEventListener('error', function (e) {
+    reportError((e.message || 'error') + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    reportError('Unhandled rejection: ' + (r && r.message ? r.message : r));
+  });
+  function reportDiag() {
+    vscode.postMessage({
+      type: 'diag',
+      chartLib: typeof Chart !== 'undefined',
+      chartRendered: !!chart,
+      holdingRows: elHoldings.querySelectorAll('tbody tr:not(.error-row)').length,
+    });
+  }
   var app = document.getElementById('app');
 
   /** @type {any} latest PanelModel */
@@ -410,6 +434,7 @@
     } else if (msg.type === 'history') {
       chartModel = msg.chart;
       renderChart();
+      reportDiag();
     }
   });
 
@@ -419,4 +444,5 @@
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   vscode.postMessage({ type: 'ready' });
+  reportDiag();
 })();

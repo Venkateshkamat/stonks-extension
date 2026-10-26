@@ -11,6 +11,10 @@ export type ToWebview =
 /** Webview -> extension. */
 export type FromWebview =
   | { type: 'ready' }
+  /** Webview health report: whether Chart.js loaded, whether a chart is drawn and how many holding rows are shown. */
+  | { type: 'diag'; chartLib: boolean; chartRendered: boolean; holdingRows: number }
+  /** An uncaught error or unhandled rejection inside the webview. */
+  | { type: 'error'; message: string }
   | { type: 'action'; action: 'add' | 'refresh' | 'toggleHide' }
   | { type: 'action'; action: 'edit' | 'remove'; id: string };
 
@@ -19,6 +23,8 @@ export function parseWebviewMessage(raw: unknown): FromWebview | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const m = raw as Record<string, unknown>;
   if (m.type === 'ready') return { type: 'ready' };
+  if (m.type === 'diag') return { type: 'diag', chartLib: m.chartLib === true, chartRendered: m.chartRendered === true, holdingRows: typeof m.holdingRows === 'number' && m.holdingRows >= 0 ? m.holdingRows : 0 };
+  if (m.type === 'error') return { type: 'error', message: typeof m.message === 'string' ? m.message.slice(0, 500) : 'unknown error' };
   if (m.type !== 'action') return undefined;
   switch (m.action) {
     case 'add':
