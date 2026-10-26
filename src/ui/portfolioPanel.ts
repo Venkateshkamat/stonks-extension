@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import { buildChartModel, ChartModel } from '../panel/chartModel';
 import { INTRADAY_TTL_MS } from '../market/marketData';
+import { LastValue } from '../panel/lastValue';
 import { PanelPrefs } from '../panel/prefs';
 import { isHeatmapSource, PanelView, viewGroup } from '../panel/views';
-import { buildPanelModel, historyKey } from '../panel/model';
+import { buildPanelModel, historyKey, PanelModel } from '../panel/model';
 import { buildHtml, FromWebview, makeNonce, parseWebviewMessage, ToWebview } from '../panel/protocol';
 import { PortfolioController, PortfolioSnapshot } from '../portfolio/controller';
 import { ChartRange } from '../types';
@@ -68,6 +69,8 @@ export class PortfolioPanel implements vscode.Disposable {
   /** When the current history was (re)loaded; the 1D range reloads at most every INTRADAY_TTL_MS. */
   private loadedAt = 0;
   private diag: PanelDiagnostics = { ready: false, errors: [], cspViolations: [] };
+  /** The last state posted to the webview, so an unchanged model is not posted (and re-rendered) again. */
+  private readonly lastState = new LastValue();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -85,7 +88,7 @@ export class PortfolioPanel implements vscode.Disposable {
     if (range === this.prefs.chartRange) return;
     await this.prefs.setChartRange(range);
     const s = this.controller.snapshot;
-    this.post({ type: 'state', model: this.model(s, { range }) });
+    this.postState(this.model(s, { range }));
     this.ensureHistory(s, true);
   }
 
@@ -98,7 +101,7 @@ export class PortfolioPanel implements vscode.Disposable {
   async setHeatmapSource(source: string): Promise<void> {
     if (!isHeatmapSource(source) || source === this.prefs.heatmapSource) return;
     await this.prefs.setHeatmapSource(source);
-    this.post({ type: 'state', model: this.model(this.controller.snapshot) });
+    this.postState(this.model(this.controller.snapshot));
   }
 
   /** The selected view (persisted). */
@@ -141,6 +144,7 @@ export class PortfolioPanel implements vscode.Disposable {
     });
     this.panel = panel;
     this.diag = { ready: false, errors: [], cspViolations: [] };
+    this.lastState.reset();
     const webview = panel.webview;
     const uri = (file: string) => webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, file)).toString();
     webview.html = buildHtml({
@@ -155,6 +159,7 @@ export class PortfolioPanel implements vscode.Disposable {
     this.subscriptions.push(
       webview.onDidReceiveMessage((raw: unknown) => void this.onMessage(parseWebviewMessage(raw))),
       this.controller.onDidUpdate((s) => this.push(s)),
+      panel.onDidChangeViewState(() => this.onViewStateChanged()),
       panel.onDidDispose(() => this.onDisposed()),
     );
   }
@@ -193,7 +198,8 @@ export class PortfolioPanel implements vscode.Disposable {
       this.diag.ready = true;
       // A (re)loaded webview starts empty: send everything again.
       const s = this.controller.snapshot;
-      this.post({ type: 'state', model: this.model(s) });
+      this.lastState.reset();
+      this.postState(this.model(s));
       if (this.chart && this.chart.key === historyKey(s, this.prefs.chartRange, viewGroup(this.prefs.view))) this.post({ type: 'history', chart: this.chart });
       else this.ensureHistory(s, true);
       return;
@@ -238,8 +244,31 @@ export class PortfolioPanel implements vscode.Disposable {
   }
 
   private push(s: PortfolioSnapshot): void {
-    this.post({ type: 'state', model: this.model(s) });
+    if (!this.visible) return; // a hidden webview is reloaded and sent everything when it is shown again
+    this.postState(this.model(s));
     this.ensureHistory(s, false);
+  }
+
+  private get visible(): boolean {
+    return this.panel?.visible !== false;
+  }
+
+  /** Hidden panels stop pulling the Markets watch-lists; showing it again resumes them and sends the current state. */
+  private onViewStateChanged(): void {
+    if (!this.visible) {
+      this.controller.setWatchlists({ indices: false, coins: false });
+      return;
+    }
+    this.applyWatchlists();
+    const s = this.controller.snapshot;
+    this.lastState.reset();
+    this.postState(this.model(s));
+    this.ensureHistory(s, false);
+  }
+
+  /** Posts the view model unless the webview already has exactly this one. */
+  private postState(model: PanelModel): void {
+    if (this.lastState.changed(model)) this.post({ type: 'state', model });
   }
 
   private model(s: PortfolioSnapshot, over: { range?: ChartRange } = {}) {
@@ -255,7 +284,7 @@ export class PortfolioPanel implements vscode.Disposable {
   private applyView(): void {
     const s = this.controller.snapshot;
     this.applyWatchlists();
-    this.post({ type: 'state', model: this.model(s) });
+    this.postState(this.model(s));
     this.ensureHistory(s, true);
   }
 
@@ -305,6 +334,7 @@ export class PortfolioPanel implements vscode.Disposable {
 
   private onDisposed(): void {
     this.panel = undefined;
+    this.lastState.reset();
     this.histKey = undefined;
     this.chart = undefined;
     this.histSeq++;

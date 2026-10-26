@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { PinItem } from '../portfolio/pins';
 import { PortfolioController, PortfolioSnapshot } from '../portfolio/controller';
-import { buildPinStatusModel, buildStatusBarModel, StatusBarModel, Tone } from '../statusBarModel';
+import { buildPinStatusModel, buildStatusBarModel, changedFields, StatusBarModel, Tone } from '../statusBarModel';
 
 const COLORS: Record<Tone, vscode.ThemeColor | undefined> = {
   gain: new vscode.ThemeColor('charts.green'),
@@ -12,6 +12,15 @@ const COLORS: Record<Tone, vscode.ThemeColor | undefined> = {
 
 const MAIN_PRIORITY = 100;
 const OPEN_COMMAND = 'stonks.openPortfolio';
+
+/** Writes only the fields of `m` that differ from `shown` to the item; returns what is shown afterwards. */
+function apply(item: vscode.StatusBarItem, shown: Partial<StatusBarModel>, m: StatusBarModel): Partial<StatusBarModel> {
+  const diff = changedFields(shown, m);
+  if (diff.text !== undefined) item.text = diff.text;
+  if (diff.tooltip !== undefined) item.tooltip = diff.tooltip;
+  if (diff.tone !== undefined) item.color = COLORS[diff.tone];
+  return m;
+}
 
 /** Read-only view of a pin's status bar item (used by the integration tests). */
 export interface PinItemInfo {
@@ -33,7 +42,8 @@ function tooltipText(t: string | vscode.MarkdownString | undefined): string {
 export class StatusBarController implements vscode.Disposable {
   private readonly item: vscode.StatusBarItem;
   private readonly sub: { dispose(): void };
-  private pinItems: Array<{ key: string; item: vscode.StatusBarItem }> = [];
+  private shown: Partial<StatusBarModel> = {};
+  private pinItems: Array<{ key: string; item: vscode.StatusBarItem; shown: Partial<StatusBarModel> }> = [];
 
   constructor(controller: PortfolioController) {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, MAIN_PRIORITY);
@@ -71,10 +81,7 @@ export class StatusBarController implements vscode.Disposable {
   }
 
   private render(s: PortfolioSnapshot): void {
-    const m = buildStatusBarModel(s);
-    this.item.text = m.text;
-    this.item.tooltip = m.tooltip;
-    this.item.color = COLORS[m.tone];
+    this.shown = apply(this.item, this.shown, buildStatusBarModel(s));
     this.renderPins(s.pins);
   }
 
@@ -87,16 +94,13 @@ export class StatusBarController implements vscode.Disposable {
         const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, MAIN_PRIORITY - (i + 1) * 0.001);
         item.name = `Stonks: ${p.name}`;
         item.command = OPEN_COMMAND;
-        return { key: p.key, item };
+        item.show();
+        return { key: p.key, item, shown: {} };
       });
     }
     pins.forEach((p, i) => {
-      const { item } = this.pinItems[i];
-      const m: StatusBarModel = buildPinStatusModel(p);
-      item.text = m.text;
-      item.tooltip = m.tooltip;
-      item.color = COLORS[m.tone];
-      item.show();
+      const entry = this.pinItems[i];
+      entry.shown = apply(entry.item, entry.shown, buildPinStatusModel(p));
     });
   }
 

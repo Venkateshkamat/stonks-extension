@@ -108,3 +108,16 @@ export function buildPinStatusModel(p: PinItem): StatusBarModel {
   lines.push('Click to open portfolio.');
   return { text: `${p.label} ${fmtPrice(p.price)} ${formatPercent(p.changePercent)}`, tooltip: lines.join('\n'), tone: percentTone(p.changePercent) };
 }
+
+/**
+ * The fields of `next` that differ from what is already shown (all of them when nothing has been shown yet).
+ * Setting a status bar item property costs an IPC message to the UI even when the value is unchanged, so only changed
+ * fields are written.
+ */
+export function changedFields(shown: Partial<StatusBarModel>, next: StatusBarModel): Partial<StatusBarModel> {
+  const out: Partial<StatusBarModel> = {};
+  if (shown.text !== next.text) out.text = next.text;
+  if (shown.tooltip !== next.tooltip) out.tooltip = next.tooltip;
+  if (shown.tone !== next.tone) out.tone = next.tone;
+  return out;
+}
