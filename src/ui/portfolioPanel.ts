@@ -25,6 +25,8 @@ export interface PanelDiagnostics {
   chartRendered?: boolean;
   /** Number of holding rows currently drawn in the table (last report). */
   holdingRows?: number;
+  /** Number of buttons in the base-currency toggle (2 when the header rendered). */
+  currencyButtons?: number;
   /** Uncaught errors / unhandled rejections reported by the webview. */
   errors: string[];
 }
@@ -100,6 +102,7 @@ export class PortfolioPanel implements vscode.Disposable {
       this.diag.chartLib = msg.chartLib;
       this.diag.chartRendered = msg.chartRendered;
       this.diag.holdingRows = msg.holdingRows;
+      this.diag.currencyButtons = msg.currencyButtons;
       return;
     }
     if (msg.type === 'error') {
@@ -114,6 +117,14 @@ export class PortfolioPanel implements vscode.Disposable {
       this.post({ type: 'state', model: buildPanelModel(s) });
       if (this.chart && this.chart.key === historyKey(s)) this.post({ type: 'history', chart: this.chart });
       else this.ensureHistory(s, true);
+      return;
+    }
+    if (msg.type === 'setCurrency') {
+      try {
+        await vscode.commands.executeCommand('stonks.setBaseCurrency', msg.currency);
+      } catch (e) {
+        void vscode.window.showErrorMessage(`Stonks: ${errorMessage(e)}`);
+      }
       return;
     }
     const command = ACTION_COMMANDS[msg.action];

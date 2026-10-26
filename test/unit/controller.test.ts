@@ -87,6 +87,35 @@ describe('PortfolioController', () => {
     controller.dispose();
   });
 
+  it('setBaseCurrency writes the setting, re-bases totals in the new currency and fetches fx', async () => {
+    const { store, controller, settings, fetch } = setup();
+    await store.add({ symbol: 'RELIANCE', market: 'NSE', quantity: 10, buyPrice: 1000 });
+    await controller.refresh();
+    assert.strictEqual(controller.snapshot.totals?.currency, 'INR');
+    assert.ok(fetch.calls.every((c) => !c.includes('USDINR')));
+    await controller.setBaseCurrency('USD');
+    assert.strictEqual(settings.value.baseCurrency, 'USD');
+    await controller.refresh(); // settle the refresh kicked off by the change
+    const t = controller.snapshot.totals!;
+    assert.strictEqual(t.currency, 'USD');
+    assert.ok(Math.abs(t.current - 11900 / 94.93) < 1e-6);
+    assert.ok(fetch.calls.some((c) => c.includes('USDINR')));
+    controller.dispose();
+  });
+
+  it('re-bases instantly on a currency change when the fx rate is already known', async () => {
+    const { store, controller } = setup();
+    await store.add({ symbol: 'AAPL', market: 'US', quantity: 2, buyPrice: 300 });
+    await controller.refresh();
+    assert.strictEqual(controller.snapshot.totals?.currency, 'INR');
+    const p = controller.setBaseCurrency('USD');
+    await p;
+    assert.strictEqual(controller.snapshot.baseCurrency, 'USD');
+    assert.strictEqual(controller.snapshot.totals?.currency, 'USD');
+    assert.ok(Math.abs(controller.snapshot.totals!.current - 2 * 347.725) < 1e-6);
+    controller.dispose();
+  });
+
   it('updates immediately when holdings change and refreshes quotes', async () => {
     const { store, controller } = setup();
     const a = await store.add({ symbol: 'RELIANCE', market: 'NSE', quantity: 1, buyPrice: 1000 });

@@ -33,6 +33,15 @@ async function clearHoldings(): Promise<void> {
   for (const h of api.store.list()) await api.store.remove(h.id);
 }
 
+/** Puts the settings the tests touch back to their defaults in both scopes. */
+async function resetSettings(): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration('stonks');
+  for (const key of ['baseCurrency', 'refreshIntervalSeconds']) {
+    await cfg.update(key, undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update(key, undefined, vscode.ConfigurationTarget.Workspace);
+  }
+}
+
 function describeErrors(s: PortfolioSnapshot): string {
   return s.errors.map((e) => `${e.label}: ${e.message}`).join('; ') || '(none)';
 }
@@ -55,6 +64,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
     // Back to the default (unset) value in whichever scope toggleHideAmounts wrote to.
     await vscode.workspace.getConfiguration('stonks').update('hideAmounts', undefined, vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('stonks').update('hideAmounts', undefined, vscode.ConfigurationTarget.Workspace);
+    await resetSettings();
   });
 
   it('activates on startup', () => {
@@ -63,6 +73,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
 
   it('registers every contributed command', async () => {
     const contributed: string[] = ext.packageJSON.contributes.commands.map((c: { command: string }) => c.command);
+    for (const id of ['stonks.setBaseCurrency']) assert.ok(contributed.includes(id), `manifest is missing ${id}`);
     assert.ok(contributed.length >= 8, `expected the manifest to contribute commands, got ${contributed.length}`);
     const all = new Set(await vscode.commands.getCommands(true));
     const missing = contributed.filter((c) => !all.has(c));
@@ -122,6 +133,22 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       await waitFor('tooltip with amounts', () => /Value:/.test(api.statusBar.tooltip));
     });
 
+    it('setBaseCurrency writes stonks.baseCurrency and re-bases the status bar tooltip', async function () {
+      this.timeout(NETWORK_TIMEOUT);
+      const cfg = () => vscode.workspace.getConfiguration('stonks');
+      assert.strictEqual(cfg().get('baseCurrency'), 'INR');
+      try {
+        await vscode.commands.executeCommand('stonks.setBaseCurrency', 'USD');
+        await waitFor('baseCurrency=USD', () => cfg().get('baseCurrency') === 'USD');
+        await waitFor('snapshot in USD with totals', () => api.controller.snapshot.baseCurrency === 'USD' && api.controller.snapshot.totals?.currency === 'USD' && !api.controller.snapshot.loading, NETWORK_TIMEOUT);
+        await waitFor('USD amounts in the tooltip', () => /Value: \$/.test(api.statusBar.tooltip));
+      } finally {
+        await cfg().update('baseCurrency', undefined, vscode.ConfigurationTarget.Global);
+        await cfg().update('baseCurrency', undefined, vscode.ConfigurationTarget.Workspace);
+      }
+      await waitFor('baseCurrency back to INR', () => api.controller.snapshot.baseCurrency === 'INR');
+    });
+
     it('openPortfolio creates exactly one panel, even when called twice', async () => {
       assert.strictEqual(webviewTabs().length, 0);
       await vscode.commands.executeCommand('stonks.openPortfolio');
@@ -146,6 +173,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       assert.strictEqual(d.ready, true);
       assert.strictEqual(d.chartLib, true, 'Chart.js did not load in the webview (typeof Chart === "undefined")');
       assert.strictEqual(d.holdingRows, 3, 'the holdings table should show the 3 seeded holdings');
+      assert.strictEqual(d.currencyButtons, 2, 'the INR | USD toggle should be rendered in the header');
       assert.strictEqual(d.chartRendered, true, 'the chart was not rendered (history fetch failed or chart code threw)');
     });
 

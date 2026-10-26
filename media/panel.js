@@ -25,6 +25,7 @@
       chartLib: typeof Chart !== 'undefined',
       chartRendered: !!chart,
       holdingRows: elHoldings.querySelectorAll('tbody tr:not(.error-row)').length,
+      currencyButtons: elTop.querySelectorAll('.currency-toggle .seg-btn').length,
     });
   }
   var app = document.getElementById('app');
@@ -83,6 +84,27 @@
     return h('button', { class: 'icon-btn' + (extraClass ? ' ' + extraClass : ''), type: 'button', title: label, 'aria-label': label, onclick: onclick }, icon(name));
   }
 
+  /** Segmented control (radio group look): options = [{value,label}], onSelect(value). */
+  function segmented(ariaLabel, options, current, onSelect, extraClass) {
+    var box = h('div', { class: 'seg' + (extraClass ? ' ' + extraClass : ''), role: 'radiogroup', 'aria-label': ariaLabel });
+    options.forEach(function (o) {
+      var on = o.value === current;
+      box.appendChild(
+        h('button', {
+          class: 'seg-btn' + (on ? ' on' : ''),
+          type: 'button',
+          role: 'radio',
+          'aria-checked': on ? 'true' : 'false',
+          'data-value': o.value,
+          title: o.title,
+          text: o.label,
+          onclick: function () { if (!on) onSelect(o.value); },
+        }),
+      );
+    });
+    return box;
+  }
+
   function act(action, id) {
     var msg = { type: 'action', action: action };
     if (id) msg.id = id;
@@ -137,11 +159,18 @@
     var toolbar = h(
       'div',
       { class: 'toolbar' },
+      segmented(
+        'Base currency',
+        [{ value: 'INR', label: 'INR', title: 'Show totals in Indian rupees' }, { value: 'USD', label: 'USD', title: 'Show totals in US dollars' }],
+        model.baseCurrency,
+        function (c) { vscode.postMessage({ type: 'setCurrency', currency: c }); },
+        'currency-toggle',
+      ),
       iconButton(model.hideAmounts ? 'eye' : 'eye-off', hideLabel, function () { act('toggleHide'); }, model.hideAmounts ? 'on' : ''),
       iconButton('refresh', 'Refresh', function () { act('refresh'); }, model.loading ? 'spin' : ''),
       h('button', { class: 'btn', type: 'button', onclick: function () { act('add'); } }, icon('plus'), 'Add holding'),
     );
-    toolbar.firstChild.setAttribute('aria-pressed', model.hideAmounts ? 'true' : 'false');
+    toolbar.querySelector('.icon-btn').setAttribute('aria-pressed', model.hideAmounts ? 'true' : 'false');
 
     elTop.replaceChildren(h('div', null, h('h1', { text: 'Stonks' }), meta), toolbar);
   }

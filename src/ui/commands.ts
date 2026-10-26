@@ -5,7 +5,7 @@ import { MarketDataService } from '../market/marketData';
 import { PortfolioController } from '../portfolio/controller';
 import { HoldingsStore } from '../portfolio/store';
 import { nativeCurrency, normalizeSymbol, validateSymbol } from '../symbols';
-import { Holding, Market, Quote } from '../types';
+import { Currency, Holding, Market, Quote } from '../types';
 import { errorMessage } from '../util/async';
 import { parseBuyDate, parseQuantity, validateBuyDate, validateBuyPrice, validateQuantity, parsePositiveNumber } from '../validation';
 import { FinnhubKeyManager } from './apiKey';
@@ -41,10 +41,35 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     reg('stonks.editHolding', (id?: unknown) => editHolding(deps, typeof id === 'string' ? id : undefined)),
     reg('stonks.removeHolding', (id?: unknown) => removeHolding(deps, typeof id === 'string' ? id : undefined)),
     reg('stonks.toggleHideAmounts', () => deps.controller.toggleHideAmounts()),
+    reg('stonks.setBaseCurrency', (value?: unknown) => setBaseCurrency(deps, value)),
     reg('stonks.refresh', () => deps.controller.refresh('manual')),
     reg('stonks.setFinnhubApiKey', () => deps.keys.setKey()),
     reg('stonks.clearFinnhubApiKey', () => deps.keys.clearKey()),
   ];
+}
+
+const CURRENCY_ITEMS: Array<vscode.QuickPickItem & { currency: Currency }> = [
+  { label: 'INR', description: 'Indian Rupee (₹)', currency: 'INR' },
+  { label: 'USD', description: 'US Dollar ($)', currency: 'USD' },
+];
+
+/**
+ * Picks the base currency (INR / USD) and writes `stonks.baseCurrency`. Passing 'INR' or 'USD' as the argument
+ * (used by the panel toggle and by tests/automation) skips the QuickPick.
+ */
+export async function setBaseCurrency(deps: CommandDeps, value?: unknown): Promise<void> {
+  let currency: Currency | undefined;
+  if (value === 'INR' || value === 'USD') currency = value;
+  else {
+    const current = deps.controller.snapshot.baseCurrency;
+    const pick = await vscode.window.showQuickPick(
+      CURRENCY_ITEMS.map((i) => (i.currency === current ? { ...i, description: `${i.description} - current`, picked: true } : i)),
+      { title: 'Stonks: Set Base Currency', placeHolder: `Current base currency: ${current}` },
+    );
+    currency = pick?.currency;
+  }
+  if (!currency || currency === deps.controller.snapshot.baseCurrency) return;
+  await deps.controller.setBaseCurrency(currency);
 }
 
 /** Fetches a fresh quote to validate a symbol. Returns undefined if the user aborted or rejected it. */

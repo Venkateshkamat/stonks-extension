@@ -185,8 +185,13 @@ export class PortfolioController implements Disposable {
   notifySettingsChanged(): void {
     const prev = this.settings;
     this.settings = this.deps.settings.get();
-    if (prev.baseCurrency !== this.settings.baseCurrency) void this.refresh('settings');
-    else {
+    if (prev.baseCurrency !== this.settings.baseCurrency) {
+      // Re-base instantly when the conversion rate is already known (or not needed) so the UI reacts at once;
+      // otherwise wait for the refresh to bring the rate.
+      const base = this.settings.baseCurrency;
+      if (this.data.fx || this.deps.store.list().every((h) => nativeCurrency(h.market) === base)) this.rebuild(true);
+      void this.refresh('settings');
+    } else {
       this.rebuild();
       this.schedule();
     }
@@ -195,6 +200,11 @@ export class PortfolioController implements Disposable {
   async toggleHideAmounts(): Promise<void> {
     await this.deps.settings.setHideAmounts(!this.settings.hideAmounts);
     // The configuration change event normally triggers notifySettingsChanged; do it directly too (idempotent).
+    this.notifySettingsChanged();
+  }
+
+  async setBaseCurrency(currency: Currency): Promise<void> {
+    await this.deps.settings.setBaseCurrency(currency);
     this.notifySettingsChanged();
   }
 

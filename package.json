@@ -47,6 +47,11 @@
         "category": "Stonks"
       },
       {
+        "command": "stonks.setBaseCurrency",
+        "title": "Set Base Currency",
+        "category": "Stonks"
+      },
+      {
         "command": "stonks.refresh",
         "title": "Refresh",
         "category": "Stonks"

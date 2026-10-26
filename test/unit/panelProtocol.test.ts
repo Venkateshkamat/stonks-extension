@@ -12,8 +12,8 @@ describe('parseWebviewMessage', () => {
   });
 
   it('accepts diag and error reports from the webview, normalising their fields', () => {
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3 });
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0 });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 'boom' }), { type: 'error', message: 'boom' });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 42 }), { type: 'error', message: 'unknown error' });
     const long = parseWebviewMessage({ type: 'error', message: 'x'.repeat(5000) });
@@ -26,6 +26,12 @@ describe('parseWebviewMessage', () => {
     assert.strictEqual(parseWebviewMessage({ type: 'action', action: 'edit' }), undefined);
     assert.strictEqual(parseWebviewMessage({ type: 'action', action: 'remove', id: 5 }), undefined);
     assert.strictEqual(parseWebviewMessage({ type: 'action', action: 'edit', id: '' }), undefined);
+  });
+
+  it('accepts only INR / USD for setCurrency', () => {
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'setCurrency', currency: 'USD' }), { type: 'setCurrency', currency: 'USD' });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'setCurrency', currency: 'INR', x: 1 }), { type: 'setCurrency', currency: 'INR' });
+    for (const bad of ['EUR', '', 5, undefined, null]) assert.strictEqual(parseWebviewMessage({ type: 'setCurrency', currency: bad }), undefined);
   });
 
   it('rejects anything unexpected', () => {

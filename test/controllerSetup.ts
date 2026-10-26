@@ -3,6 +3,7 @@ import { MarketDataService } from '../src/market/marketData';
 import { PortfolioController } from '../src/portfolio/controller';
 import { HoldingsStore, KeyValueStore } from '../src/portfolio/store';
 import { DEFAULT_SETTINGS, Settings, SettingsSource } from '../src/settings';
+import { Currency } from '../src/types';
 
 export class MemStore implements KeyValueStore {
   data = new Map<string, unknown>();
@@ -21,6 +22,9 @@ export class FakeSettings implements SettingsSource {
   }
   async setHideAmounts(v: boolean): Promise<void> {
     this.value = { ...this.value, hideAmounts: v };
+  }
+  async setBaseCurrency(v: Currency): Promise<void> {
+    this.value = { ...this.value, baseCurrency: v };
   }
 }
 

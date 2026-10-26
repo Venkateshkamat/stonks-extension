@@ -21,6 +21,7 @@ describe('package manifest', () => {
       'stonks.openPortfolio',
       'stonks.refresh',
       'stonks.removeHolding',
+      'stonks.setBaseCurrency',
       'stonks.setFinnhubApiKey',
       'stonks.toggleHideAmounts',
     ]);

@@ -141,6 +141,7 @@
         log(JSON.stringify(msg));
         console.log('[webview -> extension]', msg);
         if (msg.type === 'ready') setTimeout(function () { sendState(current); }, 0);
+        else if (msg.type === 'setCurrency') setVariant(msg.currency === 'USD' ? 'usd' : current === 'usd' ? 'shown' : current);
         else if (msg.type === 'action' && msg.action === 'toggleHide') setVariant(current === 'hidden' ? 'shown' : 'hidden');
         else if (msg.type === 'action' && msg.action === 'refresh') {
           var name = current;

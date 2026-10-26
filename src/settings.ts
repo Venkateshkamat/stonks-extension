@@ -24,4 +24,5 @@ export function parseSettings(raw: { baseCurrency?: unknown; refreshIntervalSeco
 export interface SettingsSource {
   get(): Settings;
   setHideAmounts(value: boolean): PromiseLike<void>;
+  setBaseCurrency(value: Currency): PromiseLike<void>;
 }
