@@ -22,6 +22,21 @@ export class StatusBarController implements vscode.Disposable {
     this.sub = controller.onDidUpdate((s) => this.render(s));
   }
 
+  /** Current item text, e.g. "$(graph) +2.34%". */
+  get text(): string {
+    return this.item.text;
+  }
+
+  get tooltip(): string {
+    const t = this.item.tooltip;
+    return typeof t === 'string' ? t : (t?.value ?? '');
+  }
+
+  get command(): string | undefined {
+    const c = this.item.command;
+    return typeof c === 'string' ? c : c?.command;
+  }
+
   private render(s: PortfolioSnapshot): void {
     const m = buildStatusBarModel(s);
     this.item.text = m.text;

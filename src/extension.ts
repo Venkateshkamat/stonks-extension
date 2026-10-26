@@ -7,8 +7,9 @@ import { registerCommands } from './ui/commands';
 import { PortfolioPanel } from './ui/portfolioPanel';
 import { StatusBarController } from './ui/statusBar';
 import { VsCodeSettings } from './ui/vscodeSettings';
+import { StonksTestApi } from './testApi';
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<StonksTestApi | undefined> {
   context.globalState.setKeysForSync([HOLDINGS_KEY]);
 
   // The key manager needs the market service (to verify keys) and the service needs the key: break the cycle lazily.
@@ -48,6 +49,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   void controller.start();
   void keys.promptOnActivation();
+
+  // Integration-test hook: only exposed when the test launcher sets this env var; undefined for real users.
+  return process.env.STONKS_INTEGRATION_TEST === '1' ? { store, controller, statusBar, panel } : undefined;
 }
 
 export function deactivate(): void {
