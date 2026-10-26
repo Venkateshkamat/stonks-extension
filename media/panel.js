@@ -19,18 +19,50 @@
     var r = e.reason;
     reportError('Unhandled rejection: ' + (r && r.message ? r.message : r));
   });
+  // Content-security-policy violations (ours or from the embedded widget) are collected and reported with the diag.
+  var cspViolations = [];
+  document.addEventListener('securitypolicyviolation', function (e) {
+    if (cspViolations.length < 10) {
+      var where = e.sourceFile ? ' @' + String(e.sourceFile).slice(-60) + ':' + e.lineNumber : '';
+      var sample = e.sample ? ' [' + String(e.sample).slice(0, 40).replace(/\s+/g, ' ') + ']' : '';
+      cspViolations.push(e.violatedDirective + ' ' + (e.blockedURI || '') + where + sample);
+    }
+    try {
+      reportDiag();
+    } catch (err) {
+      /* the skeleton may not exist yet */
+    }
+  });
+  /** Number of `selector` matches under `root`, or 0 when `gate` (default `root`) is hidden. */
+  function visibleCount(root, selector, gate) {
+    var section = gate || root;
+    if (section !== app && section.classList.contains('hidden')) return 0;
+    var n = 0;
+    root.querySelectorAll(selector).forEach(function (el) {
+      var hiddenAncestor = el.closest('.hidden');
+      if (!hiddenAncestor) n++;
+    });
+    return n;
+  }
   function reportDiag() {
+    var hm = elHeatmapBox.querySelector('.tradingview-widget-container');
     vscode.postMessage({
       type: 'diag',
       chartLib: typeof Chart !== 'undefined',
       chartRendered: !!chart,
-      pinButtons: app.querySelectorAll('.pin-btn').length,
-      rangeButtons: elRange.querySelectorAll('.seg-btn').length,
-      holdingRows: elHoldings.querySelectorAll('tbody tr:not(.error-row)').length,
+      // Counts cover what is shown: hidden sections (the Heatmap view hides the portfolio ones) count as 0.
+      pinButtons: visibleCount(app, '.pin-btn'),
+      rangeButtons: visibleCount(elRange, '.seg-btn', elChartSection),
+      holdingRows: visibleCount(elHoldings, 'tbody tr:not(.error-row)'),
       currencyButtons: elTop.querySelectorAll('.currency-toggle .seg-btn').length,
       viewButtons: elViews.querySelectorAll('.seg-btn').length,
       view: model ? model.view : '',
-      marketRows: elIndices.querySelectorAll('tbody tr:not(.error-row)').length,
+      marketRows: visibleCount(elIndices, 'tbody tr:not(.error-row)'),
+      heatmapContainer: !!hm,
+      heatmapIframe: !!elHeatmapBox.querySelector('iframe'),
+      heatmapLoaded: heatmapFrameLoaded,
+      heatmapSource: heatmapMounted ? heatmapMounted.source : '',
+      cspViolations: cspViolations,
     });
   }
   var app = document.getElementById('app');
@@ -136,6 +168,22 @@
 
   var elTop = h('div', { class: 'topbar' });
   var elViews = h('div', { class: 'view-switch' });
+  var heatmapMounted = null; // { key, source } of the widget currently mounted
+  var heatmapFrameLoaded = false;
+  var elHeatmapControls = h('div', { class: 'heatmap-controls' });
+  var elHeatmapBox = h('div', { class: 'heatmap-box' });
+  var elHeatmap = h(
+    'section',
+    { class: 'heatmap hidden' },
+    elHeatmapControls,
+    elHeatmapBox,
+    h(
+      'div',
+      { class: 'heatmap-note' },
+      h('a', { href: 'https://www.tradingview.com/', title: 'TradingView', rel: 'noopener noreferrer', text: 'Heatmap by TradingView' }),
+      ' · live data, may be delayed',
+    ),
+  );
   var elStatus = h('div');
   var elWarnings = h('ul', { class: 'warnings' });
   var elHoldings = h('section');
@@ -161,16 +209,20 @@
   app.appendChild(elHoldings);
   app.appendChild(elChartSection);
   app.appendChild(elIndices);
+  app.appendChild(elHeatmap);
 
   // ---------- rendering ----------
 
   function renderTop() {
     var meta = h('div', { class: 'meta' });
-    var parts = ['Base currency ' + model.baseCurrency];
-    if (model.loading) parts.push('Refreshing...');
-    else if (model.updated) parts.push('Updated ' + model.updated);
-    if (model.dataSource) parts.push('Data: ' + model.dataSource);
-    if (model.fx) parts.push(model.fx);
+    var heat = model.view === 'heatmap';
+    var parts = heat ? ['Market heatmaps'] : ['Base currency ' + model.baseCurrency];
+    if (!heat) {
+      if (model.loading) parts.push('Refreshing...');
+      else if (model.updated) parts.push('Updated ' + model.updated);
+      if (model.dataSource) parts.push('Data: ' + model.dataSource);
+      if (model.fx) parts.push(model.fx);
+    }
     parts.forEach(function (p, i) {
       if (i > 0) meta.appendChild(h('span', { class: 'sep', text: '·' }));
       meta.appendChild(document.createTextNode(p));
@@ -193,12 +245,13 @@
     );
     toolbar.querySelector('.icon-btn').setAttribute('aria-pressed', model.hideAmounts ? 'true' : 'false');
 
-    elTop.replaceChildren(h('div', null, h('h1', { text: 'Stonks' }), meta), toolbar);
+    elTop.replaceChildren.apply(elTop, [h('div', null, h('h1', { text: 'Stonks' }), meta)].concat(heat ? [] : [toolbar]));
   }
 
   var VIEW_OPTIONS = [
     { value: 'stocks', label: 'Stocks', title: 'NSE, BSE and US holdings' },
     { value: 'crypto', label: 'Crypto', title: 'Crypto holdings' },
+    { value: 'heatmap', label: 'Heatmap', title: 'Market heatmaps by TradingView' },
   ];
 
   function renderViews() {
@@ -352,12 +405,96 @@
   }
 
   function render() {
+    var heat = model.view === 'heatmap';
     renderTop();
     renderViews();
+    // The Heatmap view hides every portfolio section (and drops the chart, which is then not needed).
+    [elStatus, elWarnings, elHoldings, elChartSection, elIndices].forEach(function (el) { el.classList.toggle('hidden', heat); });
+    elHeatmap.classList.toggle('hidden', !heat);
+    if (heat) {
+      renderHeatmap();
+      return;
+    }
+    unmountHeatmap();
     renderStatus();
     renderHoldings();
     renderIndices();
     renderChartVisibility();
+  }
+
+  // ---------- heatmap (TradingView widget) ----------
+
+  var WIDGET_SCRIPTS = {
+    stock: 'https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js',
+    crypto: 'https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js',
+  };
+
+  function themeName() {
+    var c = document.body.classList;
+    return c.contains('vscode-light') || c.contains('vscode-high-contrast-light') ? 'light' : 'dark';
+  }
+
+  function unmountHeatmap() {
+    if (!heatmapMounted && elHeatmapBox.childNodes.length === 0) return;
+    elHeatmapBox.replaceChildren();
+    elHeatmapControls.replaceChildren();
+    heatmapMounted = null;
+    heatmapFrameLoaded = false;
+  }
+
+  /**
+   * Creates the TradingView widget: a container div, the widget div, and the loader <script> whose text content is
+   * the JSON config (that is how the loader reads it). Done only when the Heatmap view is shown and when the source
+   * or theme changes; periodic state updates leave the widget alone.
+   */
+  function mountHeatmap(hm) {
+    var theme = themeName();
+    var key = hm.widget + '|' + hm.source + '|' + theme;
+    if (heatmapMounted && heatmapMounted.key === key) return;
+    elHeatmapBox.replaceChildren();
+    heatmapFrameLoaded = false;
+    heatmapMounted = { key: key, source: hm.source };
+
+    var config = {};
+    Object.keys(hm.config).forEach(function (k) { config[k] = hm.config[k]; });
+    config.colorTheme = theme;
+
+    var container = h('div', { class: 'tradingview-widget-container' }, h('div', { class: 'tradingview-widget-container__widget' }));
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.async = true;
+    script.src = WIDGET_SCRIPTS[hm.widget] || WIDGET_SCRIPTS.stock;
+    script.textContent = JSON.stringify(config);
+    script.addEventListener('error', function () {
+      reportError('TradingView widget script failed to load');
+      elHeatmapBox.appendChild(h('div', { class: 'status-msg', text: 'The heatmap could not be loaded (no network, or TradingView is blocked).' }));
+      reportDiag();
+    });
+    container.appendChild(script);
+    elHeatmapBox.appendChild(container);
+    reportDiag();
+  }
+
+  // The widget creates its iframe a moment after the script runs: watch for it to report its load.
+  new MutationObserver(function () {
+    var frame = elHeatmapBox.querySelector('iframe');
+    if (frame && !frame.dataset.watched) {
+      frame.dataset.watched = '1';
+      frame.addEventListener('load', function () {
+        heatmapFrameLoaded = true;
+        reportDiag();
+      });
+    }
+    reportDiag();
+  }).observe(elHeatmapBox, { childList: true, subtree: true });
+
+  function renderHeatmap() {
+    var hm = model.heatmap;
+    if (!hm) return;
+    elHeatmapControls.replaceChildren(
+      segmented('Heatmap source', hm.options, hm.source, function (v) { vscode.postMessage({ type: 'setHeatmapSource', source: v }); }, 'heatmap-toggle'),
+    );
+    mountHeatmap(hm);
   }
 
   // ---------- chart ----------
@@ -529,6 +666,7 @@
   // Re-apply theme colours to the chart when VS Code switches themes (it swaps classes on <body>).
   new MutationObserver(function () {
     if (chart && chartModel) renderChart();
+    if (model && model.view === 'heatmap' && model.heatmap) mountHeatmap(model.heatmap); // re-theme the widget
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   vscode.postMessage({ type: 'ready' });

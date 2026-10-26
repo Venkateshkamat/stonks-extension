@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { MemStore } from '../controllerSetup';
-import { CHART_RANGE_KEY, PANEL_VIEW_KEY, PanelPrefs } from '../../src/panel/prefs';
+import { CHART_RANGE_KEY, HEATMAP_SOURCE_KEY, PANEL_VIEW_KEY, PanelPrefs } from '../../src/panel/prefs';
 import { buildPanelModel } from '../../src/panel/model';
 import { setup } from '../controllerSetup';
 
@@ -32,9 +32,26 @@ describe('PanelPrefs view', () => {
     await prefs.setView('crypto');
     assert.strictEqual(mem.data.get(PANEL_VIEW_KEY), 'crypto');
     assert.strictEqual(new PanelPrefs(mem).view, 'crypto');
+    await prefs.setView('heatmap');
+    assert.strictEqual(new PanelPrefs(mem).view, 'heatmap');
     for (const bad of ['bonds', 3, null]) {
       mem.data.set(PANEL_VIEW_KEY, bad);
       assert.strictEqual(new PanelPrefs(mem).view, 'stocks');
+    }
+  });
+});
+
+describe('PanelPrefs heatmap source', () => {
+  it('defaults to the S&P 500, persists a change and ignores garbage', async () => {
+    const mem = new MemStore();
+    const prefs = new PanelPrefs(mem);
+    assert.strictEqual(prefs.heatmapSource, 'SPX500');
+    await prefs.setHeatmapSource('CRYPTO');
+    assert.strictEqual(mem.data.get(HEATMAP_SOURCE_KEY), 'CRYPTO');
+    assert.strictEqual(new PanelPrefs(mem).heatmapSource, 'CRYPTO');
+    for (const bad of ['NIFTY50', 7, null]) {
+      mem.data.set(HEATMAP_SOURCE_KEY, bad);
+      assert.strictEqual(new PanelPrefs(mem).heatmapSource, 'SPX500');
     }
   });
 });

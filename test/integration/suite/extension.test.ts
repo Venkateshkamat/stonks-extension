@@ -46,6 +46,16 @@ async function resetSettings(): Promise<void> {
   }
 }
 
+/**
+ * CSP violations the webview reported, minus the one known-harmless one: TradingView's loader always injects an inline
+ * <style> with rules for its optional `.tradingview-widget-copyright` footer (which we do not use; our own note
+ * replaces it), and our strict style-src blocks it. Anything else would be a real problem.
+ */
+function unexpectedCspViolations(violations: readonly string[]): string[] {
+  const knownBenign = /^style-src-elem inline @.*external-embedding\/embed-widget-[a-z-]+\.js:\d+/; // sourceFile is truncated by the webview
+  return violations.filter((v) => !knownBenign.test(v));
+}
+
 function describeErrors(s: PortfolioSnapshot): string {
   return s.errors.map((e) => `${e.label}: ${e.message}`).join('; ') || '(none)';
 }
@@ -230,7 +240,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       assert.strictEqual(d.chartLib, true, 'Chart.js did not load in the webview (typeof Chart === "undefined")');
       assert.strictEqual(api.panel.view, 'stocks', 'default view');
       assert.strictEqual(d.view, 'stocks');
-      assert.strictEqual(d.viewButtons, 2, 'the Stocks | Crypto switcher should be rendered');
+      assert.strictEqual(d.viewButtons, 3, 'the Stocks | Crypto | Heatmap switcher should be rendered');
       assert.strictEqual(d.holdingRows, 2, 'the Stocks view shows the 2 seeded stock holdings (AAPL, RELIANCE), not BTC');
       assert.strictEqual(d.currencyButtons, 2, 'the INR | USD toggle should be rendered in the header');
       assert.ok((d.pinButtons ?? 0) >= 3, `every holding row has a pin button, got ${d.pinButtons}`);
@@ -278,6 +288,51 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       await waitFor('webview back on stocks with 2 rows', () => api.panel.diagnostics.view === 'stocks' && api.panel.diagnostics.holdingRows === 2, 20_000);
       assert.strictEqual(api.panel.view, 'stocks');
       assert.deepStrictEqual(api.panel.diagnostics.errors, []);
+    });
+
+    it('the Heatmap view injects the TradingView widget under the real CSP: container + iframe created, no CSP or script errors, source and view persist', async function () {
+      this.timeout(NETWORK_TIMEOUT + 30_000);
+      const diag = () => api.panel.diagnostics;
+      try {
+        assert.strictEqual(diag().heatmapContainer, false, 'no widget (and no TradingView script) outside the Heatmap view');
+        await api.panel.setView('heatmap');
+        await waitFor('webview on the heatmap view with the widget container', () => diag().view === 'heatmap' && diag().heatmapContainer === true, 20_000);
+        assert.strictEqual(diag().viewButtons, 3, 'Stocks | Crypto | Heatmap switcher');
+        assert.strictEqual(diag().holdingRows, 0, 'the heatmap view hides the portfolio sections');
+        assert.strictEqual(diag().heatmapSource, 'SPX500', 'default source');
+        assert.strictEqual(api.controller.snapshot.indices.length + api.controller.snapshot.coins.length, 0, 'no Markets quotes are fetched for the heatmap view');
+        await waitFor('TradingView iframe created by the widget script (script-src / frame-src blocked?)', () => diag().heatmapIframe === true || unexpectedCspViolations(diag().cspViolations).length > 0 || diag().errors.length > 0, 45_000);
+        await waitFor('TradingView iframe loaded', () => diag().heatmapLoaded === true || unexpectedCspViolations(diag().cspViolations).length > 0, 45_000);
+        assert.deepStrictEqual(unexpectedCspViolations(diag().cspViolations), [], `CSP violations in the webview: ${diag().cspViolations.join(' | ')}`);
+        assert.deepStrictEqual(diag().errors, [], `webview reported errors: ${diag().errors.join(' | ')}`);
+        assert.strictEqual(diag().heatmapIframe, true);
+        assert.strictEqual(diag().heatmapLoaded, true);
+
+        // Changing the source re-mounts the widget (a fresh iframe) and is persisted.
+        await api.panel.setHeatmapSource('CRYPTO');
+        assert.strictEqual(api.panel.heatmapSource, 'CRYPTO');
+        await waitFor('crypto coins heatmap mounted', () => diag().heatmapSource === 'CRYPTO' && diag().heatmapIframe === true && diag().heatmapLoaded === true, 45_000);
+        assert.deepStrictEqual(unexpectedCspViolations(diag().cspViolations), [], `CSP violations after switching source: ${diag().cspViolations.join(' | ')}`);
+        assert.deepStrictEqual(diag().errors, []);
+
+        // The view and the source survive closing and reopening the panel.
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await waitFor('panel closed', () => !api.panel.isOpen);
+        await vscode.commands.executeCommand('stonks.openPortfolio');
+        await waitFor('reopened on the heatmap view with the crypto source', () => diag().ready && diag().view === 'heatmap' && diag().heatmapSource === 'CRYPTO' && diag().heatmapContainer === true, 20_000);
+        await waitFor('widget iframe after reopen', () => diag().heatmapIframe === true && diag().heatmapLoaded === true, 45_000);
+
+        // Leaving the view removes the widget again.
+        await api.panel.setView('stocks');
+        await waitFor('back on stocks without a widget', () => diag().view === 'stocks' && diag().heatmapContainer === false && diag().holdingRows === 2, 20_000);
+        assert.deepStrictEqual(unexpectedCspViolations(diag().cspViolations), []);
+        assert.deepStrictEqual(diag().errors, []);
+      } finally {
+        await api.panel.setHeatmapSource('SPX500'); // restore the defaults so persisted state does not leak
+        await api.panel.setView('stocks');
+      }
+      assert.strictEqual(api.panel.view, 'stocks');
+      assert.strictEqual(api.panel.heatmapSource, 'SPX500');
     });
 
     it('switching the chart range to 1D and 15D loads the matching chart without webview errors, and persists the choice', async function () {

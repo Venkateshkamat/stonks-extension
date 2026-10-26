@@ -13,7 +13,7 @@ import { PortfolioTotals } from '../portfolio/calc';
 import { holdingPin, pinKey } from '../portfolio/pins';
 import { marketGroup, nativeCurrency, PortfolioGroup } from '../symbols';
 import { ChartRange, DEFAULT_CHART_RANGE } from '../types';
-import { DEFAULT_PANEL_VIEW, PanelView } from './views';
+import { DEFAULT_HEATMAP_SOURCE, DEFAULT_PANEL_VIEW, findHeatmapSource, HEATMAP_SOURCES, HeatmapWidget, heatmapConfig, PanelView, viewGroup } from './views';
 
 /** Serializable view model posted to the webview. All formatting happens here so the webview stays dumb. */
 
@@ -64,9 +64,21 @@ export interface IndexGroupModel {
   items: IndexItemModel[];
 }
 
+/** What the Heatmap view needs to embed a TradingView widget. */
+export interface HeatmapModel {
+  /** Selected source id (HEATMAP_SOURCES). */
+  source: string;
+  widget: HeatmapWidget;
+  /** Widget JSON config without `colorTheme` (the webview adds it from the VS Code theme). */
+  config: Record<string, string | number | boolean>;
+  options: Array<{ value: string; label: string }>;
+}
+
 export interface PanelModel {
-  /** Selected view (drives the Stocks | Crypto switcher). */
+  /** Selected view (drives the Stocks | Crypto | Heatmap switcher). */
   view: PanelView;
+  /** Present only in the Heatmap view. */
+  heatmap?: HeatmapModel;
   hideAmounts: boolean;
   baseCurrency: string;
   /** Selected chart range (drives the 1D | 15D | 30D selector). */
@@ -102,6 +114,8 @@ export interface PanelModelOptions {
   range?: ChartRange;
   /** Selected view; defaults to Stocks. */
   view?: PanelView;
+  /** Selected heatmap source (Heatmap view); defaults to the S&P 500. */
+  heatmapSource?: string;
 }
 
 const MUTED: Cell = { text: '--', tone: 'muted' };
@@ -224,8 +238,9 @@ function buildCoins(coins: readonly IndexResult[], pinned: ReadonlySet<string>):
 export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = {}): PanelModel {
   const formatTime = opts.formatTime ?? ((ms: number) => new Date(ms).toLocaleTimeString());
   const view = opts.view ?? DEFAULT_PANEL_VIEW;
-  const rows = s.holdings.filter((r) => marketGroup(r.holding.market) === view);
-  const summary = s.groups.find((g) => g.group === view);
+  const group = viewGroup(view);
+  const rows = group ? s.holdings.filter((r) => marketGroup(r.holding.market) === group) : [];
+  const summary = group ? s.groups.find((g) => g.group === group) : undefined;
   const totals = summary?.totals;
   const crossCurrency = rows.some((r) => nativeCurrency(r.holding.market) !== s.baseCurrency);
 
@@ -249,14 +264,19 @@ export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = 
       : undefined;
   const sources = [...new Set(rows.flatMap((r) => (r.quote ? [r.quote.source] : [])))];
   const crypto = view === 'crypto';
+  const heatmapSource = findHeatmapSource(opts.heatmapSource ?? DEFAULT_HEATMAP_SOURCE);
 
   return {
     view,
+    heatmap:
+      view === 'heatmap'
+        ? { source: heatmapSource.id, widget: heatmapSource.widget, config: heatmapConfig(heatmapSource.id), options: HEATMAP_SOURCES.map((o) => ({ value: o.id, label: o.label })) }
+        : undefined,
     hideAmounts: s.hideAmounts,
     baseCurrency: s.baseCurrency,
     chartRange: opts.range ?? DEFAULT_CHART_RANGE,
     loading: s.loading,
-    empty: rows.length === 0,
+    empty: group ? rows.length === 0 : false,
     updated: s.lastUpdated !== undefined ? formatTime(s.lastUpdated) : undefined,
     dataSource: sources.length > 0 ? sourceLabel(sources) : undefined,
     fx,
@@ -264,8 +284,8 @@ export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = 
     cards: buildCards(totals, s.hideAmounts),
     columns: buildColumns(s.hideAmounts),
     rows: rows.map((r) => buildRow(r, s.hideAmounts, pinned)),
-    indices: crypto ? buildCoins(s.coins, pinned) : buildIndices(s.indices, pinned),
-    indicesLoading: (crypto ? s.coins : s.indices).length === 0,
+    indices: !group ? [] : crypto ? buildCoins(s.coins, pinned) : buildIndices(s.indices, pinned),
+    indicesLoading: group ? (crypto ? s.coins : s.indices).length === 0 : false,
     marketsTitle: crypto ? 'Major coins' : 'Markets',
     marketsNameLabel: crypto ? 'Coin' : 'Index',
     marketsLevelLabel: crypto ? 'Price' : 'Level',

@@ -325,6 +325,45 @@ describe('buildPanelModel views', () => {
   });
 });
 
+describe('buildPanelModel heatmap view', () => {
+  const s = snapshot([reliance, aapl, doge]);
+
+  it('has no portfolio sections, no empty state and carries the widget config', () => {
+    const m = buildPanelModel(s, { view: 'heatmap' });
+    assert.strictEqual(m.view, 'heatmap');
+    assert.deepStrictEqual([m.rows, m.cards, m.indices, m.warnings], [[], [], [], []]);
+    assert.strictEqual(m.empty, false, 'the heatmap view does not show the empty state even without holdings');
+    assert.strictEqual(buildPanelModel(snapshot([]), { view: 'heatmap' }).empty, false);
+    assert.strictEqual(m.indicesLoading, false);
+    assert.ok(m.heatmap);
+    assert.strictEqual(m.heatmap.source, 'SPX500', 'default source');
+    assert.strictEqual(m.heatmap.widget, 'stock');
+    assert.strictEqual(m.heatmap.config.dataSource, 'SPX500');
+    assert.ok(!('colorTheme' in m.heatmap.config), 'the webview adds the theme');
+  });
+
+  it('lists every source and switches widget for crypto', () => {
+    const m = buildPanelModel(s, { view: 'heatmap', heatmapSource: 'CRYPTO' });
+    assert.deepStrictEqual(m.heatmap!.options.map((o) => o.value), ['SPX500', 'NASDAQ100', 'DJDJI', 'SENSEX', 'CRYPTO']);
+    assert.deepStrictEqual(m.heatmap!.options.map((o) => o.label), ['S&P 500', 'Nasdaq 100', 'Dow 30', 'SENSEX', 'Crypto']);
+    assert.strictEqual(m.heatmap!.source, 'CRYPTO');
+    assert.strictEqual(m.heatmap!.widget, 'crypto');
+    assert.strictEqual(m.heatmap!.config.dataSource, 'Crypto');
+    assert.strictEqual(m.heatmap!.config.blockSize, 'market_cap_calc');
+  });
+
+  it('falls back to the S&P 500 for an unknown source and is JSON-serializable', () => {
+    const m = buildPanelModel(s, { view: 'heatmap', heatmapSource: 'NIFTY50' });
+    assert.strictEqual(m.heatmap!.source, 'SPX500');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(m)), JSON.parse(JSON.stringify(m)));
+  });
+
+  it('is absent in the portfolio views', () => {
+    assert.strictEqual(buildPanelModel(s, { view: 'stocks' }).heatmap, undefined);
+    assert.strictEqual(buildPanelModel(s, { view: 'crypto' }).heatmap, undefined);
+  });
+});
+
 describe('toneOf', () => {
   it('treats values that round to zero as neutral', () => {
     assert.strictEqual(toneOf(0.004), undefined);

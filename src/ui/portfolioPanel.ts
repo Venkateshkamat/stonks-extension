@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { buildChartModel, ChartModel } from '../panel/chartModel';
 import { INTRADAY_TTL_MS } from '../market/marketData';
 import { PanelPrefs } from '../panel/prefs';
-import { PanelView } from '../panel/views';
+import { isHeatmapSource, PanelView, viewGroup } from '../panel/views';
 import { buildPanelModel, historyKey } from '../panel/model';
 import { buildHtml, FromWebview, makeNonce, parseWebviewMessage, ToWebview } from '../panel/protocol';
 import { PortfolioController, PortfolioSnapshot } from '../portfolio/controller';
@@ -42,6 +42,14 @@ export interface PanelDiagnostics {
   view?: string;
   /** Rows in the Markets table (indices or coins). */
   marketRows?: number;
+  /** Heatmap view: the widget container exists / TradingView's iframe was created / that iframe fired `load`. */
+  heatmapContainer?: boolean;
+  heatmapIframe?: boolean;
+  heatmapLoaded?: boolean;
+  /** Heatmap view: the source the widget is mounted for ('' when none). */
+  heatmapSource?: string;
+  /** Content-security-policy violations seen in the webview ("directive blockedURI"). */
+  cspViolations: string[];
   /** Uncaught errors / unhandled rejections reported by the webview. */
   errors: string[];
 }
@@ -59,7 +67,7 @@ export class PortfolioPanel implements vscode.Disposable {
   private histSeq = 0;
   /** When the current history was (re)loaded; the 1D range reloads at most every INTRADAY_TTL_MS. */
   private loadedAt = 0;
-  private diag: PanelDiagnostics = { ready: false, errors: [] };
+  private diag: PanelDiagnostics = { ready: false, errors: [], cspViolations: [] };
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -79,6 +87,18 @@ export class PortfolioPanel implements vscode.Disposable {
     const s = this.controller.snapshot;
     this.post({ type: 'state', model: this.model(s, { range }) });
     this.ensureHistory(s, true);
+  }
+
+  /** The selected heatmap source id (persisted). */
+  get heatmapSource(): string {
+    return this.prefs.heatmapSource;
+  }
+
+  /** Changes and persists the heatmap source; the webview re-mounts the widget. Used by the selector and by tests. */
+  async setHeatmapSource(source: string): Promise<void> {
+    if (!isHeatmapSource(source) || source === this.prefs.heatmapSource) return;
+    await this.prefs.setHeatmapSource(source);
+    this.post({ type: 'state', model: this.model(this.controller.snapshot) });
   }
 
   /** The selected view (persisted). */
@@ -105,7 +125,7 @@ export class PortfolioPanel implements vscode.Disposable {
 
   /** Snapshot of the webview's self-reported health (reset each time the panel is opened). */
   get diagnostics(): PanelDiagnostics {
-    return { ...this.diag, errors: [...this.diag.errors] };
+    return { ...this.diag, errors: [...this.diag.errors], cspViolations: [...this.diag.cspViolations] };
   }
 
   /** Opens the panel, or reveals it if it is already open. */
@@ -120,7 +140,7 @@ export class PortfolioPanel implements vscode.Disposable {
       localResourceRoots: [mediaRoot],
     });
     this.panel = panel;
-    this.diag = { ready: false, errors: [] };
+    this.diag = { ready: false, errors: [], cspViolations: [] };
     const webview = panel.webview;
     const uri = (file: string) => webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, file)).toString();
     webview.html = buildHtml({
@@ -157,6 +177,11 @@ export class PortfolioPanel implements vscode.Disposable {
       this.diag.viewButtons = msg.viewButtons;
       this.diag.view = msg.view;
       this.diag.marketRows = msg.marketRows;
+      this.diag.heatmapContainer = msg.heatmapContainer;
+      this.diag.heatmapIframe = msg.heatmapIframe;
+      this.diag.heatmapLoaded = msg.heatmapLoaded;
+      this.diag.heatmapSource = msg.heatmapSource;
+      this.diag.cspViolations = msg.cspViolations;
       return;
     }
     if (msg.type === 'error') {
@@ -169,7 +194,7 @@ export class PortfolioPanel implements vscode.Disposable {
       // A (re)loaded webview starts empty: send everything again.
       const s = this.controller.snapshot;
       this.post({ type: 'state', model: this.model(s) });
-      if (this.chart && this.chart.key === historyKey(s, this.prefs.chartRange, this.prefs.view)) this.post({ type: 'history', chart: this.chart });
+      if (this.chart && this.chart.key === historyKey(s, this.prefs.chartRange, viewGroup(this.prefs.view))) this.post({ type: 'history', chart: this.chart });
       else this.ensureHistory(s, true);
       return;
     }
@@ -180,6 +205,10 @@ export class PortfolioPanel implements vscode.Disposable {
       } catch (e) {
         void vscode.window.showErrorMessage(`Stonks: ${errorMessage(e)}`);
       }
+      return;
+    }
+    if (msg.type === 'setHeatmapSource') {
+      await this.setHeatmapSource(msg.source);
       return;
     }
     if (msg.type === 'setView') {
@@ -214,12 +243,12 @@ export class PortfolioPanel implements vscode.Disposable {
   }
 
   private model(s: PortfolioSnapshot, over: { range?: ChartRange } = {}) {
-    return buildPanelModel(s, { range: over.range ?? this.prefs.chartRange, view: this.prefs.view });
+    return buildPanelModel(s, { range: over.range ?? this.prefs.chartRange, view: this.prefs.view, heatmapSource: this.prefs.heatmapSource });
   }
 
   /** The Markets table follows the view: indices while Stocks is shown, major coins while Crypto is shown. */
   private applyWatchlists(): void {
-    const view = this.prefs.view;
+    const view = this.prefs.view; // the Heatmap view needs neither
     this.controller.setWatchlists({ indices: view === 'stocks', coins: view === 'crypto' });
   }
 
@@ -236,8 +265,8 @@ export class PortfolioPanel implements vscode.Disposable {
    * at most every INTRADAY_TTL_MS.
    */
   private ensureHistory(s: PortfolioSnapshot, force: boolean): void {
-    const group: PortfolioGroup = this.prefs.view;
-    if (!s.groups.some((g) => g.group === group)) {
+    const group: PortfolioGroup | undefined = viewGroup(this.prefs.view);
+    if (!group || !s.groups.some((g) => g.group === group)) {
       this.histKey = undefined;
       this.chart = undefined;
       this.histSeq++;

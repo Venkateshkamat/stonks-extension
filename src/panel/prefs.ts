@@ -1,12 +1,13 @@
 import { KeyValueStore } from '../portfolio/store';
 import { ChartRange, DEFAULT_CHART_RANGE, isChartRange } from '../types';
-import { DEFAULT_PANEL_VIEW, isPanelView, PanelView } from './views';
+import { DEFAULT_HEATMAP_SOURCE, DEFAULT_PANEL_VIEW, isHeatmapSource, isPanelView, PanelView } from './views';
 
 export const CHART_RANGE_KEY = 'stonks.chartRange';
 export const PANEL_VIEW_KEY = 'stonks.panelView';
+export const HEATMAP_SOURCE_KEY = 'stonks.heatmapSource';
 
 /**
- * Persisted panel preferences (per machine; kept in globalState): the chart range and the selected view.
+ * Persisted panel preferences (per machine; kept in globalState): the chart range, the selected view and the heatmap source.
  *
  * Writes are cached in memory: the extension host can briefly hand back a stale globalState value (an echo of an
  * earlier write) for a few hundred ms after a newer write, which would flip the UI back. Reads therefore prefer
@@ -42,5 +43,15 @@ export class PanelPrefs {
 
   async setView(view: PanelView): Promise<void> {
     await this.write(PANEL_VIEW_KEY, view);
+  }
+
+  /** The selected heatmap source id (see HEATMAP_SOURCES). */
+  get heatmapSource(): string {
+    const v = this.read(HEATMAP_SOURCE_KEY, DEFAULT_HEATMAP_SOURCE);
+    return isHeatmapSource(v) ? v : DEFAULT_HEATMAP_SOURCE;
+  }
+
+  async setHeatmapSource(source: string): Promise<void> {
+    await this.write(HEATMAP_SOURCE_KEY, source);
   }
 }

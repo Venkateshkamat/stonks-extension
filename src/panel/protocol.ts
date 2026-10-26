@@ -2,7 +2,7 @@ import { randomInt } from 'crypto';
 import { ChartModel } from './chartModel';
 import { ChartRange, Currency, isChartRange } from '../types';
 import { PortfolioGroup } from '../symbols';
-import { isPanelView, PanelView } from './views';
+import { isHeatmapSource, isPanelView, PanelView } from './views';
 import { parsePinKey } from '../portfolio/pins';
 import { PanelModel } from './model';
 
@@ -24,20 +24,30 @@ export type FromWebview =
       currencyButtons: number;
       rangeButtons: number;
       pinButtons: number;
-      /** Buttons in the Stocks | Crypto switcher (2 when rendered). */
+      /** Buttons in the Stocks | Crypto | Heatmap switcher (3 when rendered). */
       viewButtons: number;
       /** The view the webview is showing ('' until the first state arrives). */
       view: string;
       /** Rows in the Markets table (indices or coins). */
       marketRows: number;
+      /** Heatmap view: the widget container exists / TradingView's iframe was created / that iframe fired `load`. */
+      heatmapContainer: boolean;
+      heatmapIframe: boolean;
+      heatmapLoaded: boolean;
+      /** Heatmap view: the source the widget was mounted for ('' when none). */
+      heatmapSource: string;
+      /** `securitypolicyviolation` events seen in the webview, as "directive blockedURI" (capped). */
+      cspViolations: string[];
     }
   /** An uncaught error or unhandled rejection inside the webview. */
   | { type: 'error'; message: string }
   | { type: 'action'; action: 'refresh' | 'toggleHide' }
   /** Add holding; `group` (the current view) narrows the market choice, crypto pre-selects CRYPTO. */
   | { type: 'action'; action: 'add'; group?: PortfolioGroup }
-  /** Stocks | Crypto switcher. */
+  /** Stocks | Crypto | Heatmap switcher. */
   | { type: 'setView'; view: PanelView }
+  /** Heatmap source selector (S&P 500, Nasdaq 100, ...). */
+  | { type: 'setHeatmapSource'; source: string }
   /** Base-currency toggle in the panel header. */
   | { type: 'setCurrency'; currency: Currency }
   /** Chart range selector (1D | 15D | 30D). */
@@ -64,10 +74,16 @@ export function parseWebviewMessage(raw: unknown): FromWebview | undefined {
       viewButtons: count(m.viewButtons),
       view: typeof m.view === 'string' ? m.view.slice(0, 20) : '',
       marketRows: count(m.marketRows),
+      heatmapContainer: m.heatmapContainer === true,
+      heatmapIframe: m.heatmapIframe === true,
+      heatmapLoaded: m.heatmapLoaded === true,
+      heatmapSource: typeof m.heatmapSource === 'string' ? m.heatmapSource.slice(0, 40) : '',
+      cspViolations: Array.isArray(m.cspViolations) ? m.cspViolations.filter((v): v is string => typeof v === 'string').slice(0, 10).map((v) => v.slice(0, 200)) : [],
     };
   }
   if (m.type === 'error') return { type: 'error', message: typeof m.message === 'string' ? m.message.slice(0, 500) : 'unknown error' };
   if (m.type === 'setCurrency') return m.currency === 'INR' || m.currency === 'USD' ? { type: 'setCurrency', currency: m.currency } : undefined;
+  if (m.type === 'setHeatmapSource') return isHeatmapSource(m.source) ? { type: 'setHeatmapSource', source: m.source } : undefined;
   if (m.type === 'setView') return isPanelView(m.view) ? { type: 'setView', view: m.view } : undefined;
   if (m.type === 'setRange') return isChartRange(m.range) ? { type: 'setRange', range: m.range } : undefined;
   if (m.type === 'togglePin') return parsePinKey(m.key) ? { type: 'togglePin', key: m.key as string } : undefined;
@@ -86,6 +102,11 @@ export function parseWebviewMessage(raw: unknown): FromWebview | undefined {
   }
 }
 
+/** The only origins the webview may talk to besides itself: TradingView's widget loader script and its widget iframe. */
+export const TRADINGVIEW_SCRIPT_SRC = 'https://s3.tradingview.com';
+/** www.tradingview-widget.com hosts the widget; the loader falls back to s.tradingview.com if that frame is blocked. */
+export const TRADINGVIEW_FRAME_SRC = ['https://www.tradingview-widget.com', 'https://s.tradingview.com'];
+
 export interface HtmlOptions {
   cspSource: string;
   nonce: string;
@@ -94,12 +115,17 @@ export interface HtmlOptions {
   scriptUri: string;
 }
 
-/** The webview document. Strict CSP: only nonce'd scripts and local styles, no inline script/style, no network. */
+/**
+ * The webview document. Strict CSP: our own scripts are nonce'd, styles are local, no inline script/style, no
+ * `connect-src`. The Heatmap view additionally needs TradingView's loader script (`script-src`) and its widget
+ * iframe (`frame-src`); nothing else is opened up.
+ */
 export function buildHtml(o: HtmlOptions): string {
   const csp = [
     `default-src 'none'`,
     `style-src ${o.cspSource}`,
-    `script-src 'nonce-${o.nonce}'`,
+    `script-src 'nonce-${o.nonce}' ${TRADINGVIEW_SCRIPT_SRC}`,
+    `frame-src ${TRADINGVIEW_FRAME_SRC.join(' ')}`,
     `img-src ${o.cspSource} data:`,
     `font-src ${o.cspSource}`,
   ].join('; ');

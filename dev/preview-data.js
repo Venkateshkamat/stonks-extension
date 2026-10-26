@@ -2573,6 +2573,507 @@ window.STONKS_MOCK = {
      }
     }
    }
+  },
+  "heatmap": {
+   "SPX500": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SPX500",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SPX500",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "NASDAQ100": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "NASDAQ100",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "NASDAQ100",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "DJDJI": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "DJDJI",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "DJDJI",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "SENSEX": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SENSEX",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SENSEX",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "CRYPTO": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "CRYPTO",
+     "widget": "crypto",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "Crypto",
+      "blockSize": "market_cap_calc",
+      "blockColor": "24h_close_change|5"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   }
   }
  },
  "hidden": {
@@ -4698,6 +5199,407 @@ window.STONKS_MOCK = {
       "errors": []
      }
     }
+   }
+  },
+  "heatmap": {
+   "SPX500": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SPX500",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SPX500",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": true,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "NASDAQ100": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "NASDAQ100",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "NASDAQ100",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": true,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "DJDJI": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "DJDJI",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "DJDJI",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": true,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "SENSEX": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SENSEX",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SENSEX",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": true,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "CRYPTO": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "CRYPTO",
+     "widget": "crypto",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "Crypto",
+      "blockSize": "market_cap_calc",
+      "blockColor": "24h_close_change|5"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": true,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
    }
   }
  },
@@ -7272,6 +8174,507 @@ window.STONKS_MOCK = {
       "errors": []
      }
     }
+   }
+  },
+  "heatmap": {
+   "SPX500": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SPX500",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SPX500",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "USD",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "NASDAQ100": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "NASDAQ100",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "NASDAQ100",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "USD",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "DJDJI": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "DJDJI",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "DJDJI",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "USD",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "SENSEX": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SENSEX",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SENSEX",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "USD",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "CRYPTO": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "CRYPTO",
+     "widget": "crypto",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "Crypto",
+      "blockSize": "market_cap_calc",
+      "blockColor": "24h_close_change|5"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "USD",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
    }
   }
  },
@@ -9869,6 +11272,517 @@ window.STONKS_MOCK = {
      }
     }
    }
+  },
+  "heatmap": {
+   "SPX500": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SPX500",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SPX500",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": [
+     "Finnhub: Finnhub rate limit reached; using Yahoo Finance instead."
+    ]
+   },
+   "NASDAQ100": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "NASDAQ100",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "NASDAQ100",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": [
+     "Finnhub: Finnhub rate limit reached; using Yahoo Finance instead."
+    ]
+   },
+   "DJDJI": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "DJDJI",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "DJDJI",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": [
+     "Finnhub: Finnhub rate limit reached; using Yahoo Finance instead."
+    ]
+   },
+   "SENSEX": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SENSEX",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SENSEX",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": [
+     "Finnhub: Finnhub rate limit reached; using Yahoo Finance instead."
+    ]
+   },
+   "CRYPTO": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "CRYPTO",
+     "widget": "crypto",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "Crypto",
+      "blockSize": "market_cap_calc",
+      "blockColor": "24h_close_change|5"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": [
+     "Finnhub: Finnhub rate limit reached; using Yahoo Finance instead."
+    ]
+   }
   }
  },
  "loading": {
@@ -10472,6 +12386,502 @@ window.STONKS_MOCK = {
      "30D": null
     }
    }
+  },
+  "heatmap": {
+   "SPX500": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SPX500",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SPX500",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": true,
+    "empty": false,
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "NASDAQ100": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "NASDAQ100",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "NASDAQ100",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": true,
+    "empty": false,
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "DJDJI": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "DJDJI",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "DJDJI",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": true,
+    "empty": false,
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "SENSEX": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SENSEX",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SENSEX",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": true,
+    "empty": false,
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "CRYPTO": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "CRYPTO",
+     "widget": "crypto",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "Crypto",
+      "blockSize": "market_cap_calc",
+      "blockColor": "24h_close_change|5"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": true,
+    "empty": false,
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   }
   }
  },
  "empty": {
@@ -10859,6 +13269,507 @@ window.STONKS_MOCK = {
      "warnings": []
     },
     "charts": {}
+   }
+  },
+  "heatmap": {
+   "SPX500": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SPX500",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SPX500",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "NASDAQ100": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "NASDAQ100",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "NASDAQ100",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "DJDJI": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "DJDJI",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "DJDJI",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "SENSEX": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "SENSEX",
+     "widget": "stock",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "SENSEX",
+      "blockSize": "market_cap_basic",
+      "blockColor": "change",
+      "grouping": "sector"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
+   },
+   "CRYPTO": {
+    "view": "heatmap",
+    "heatmap": {
+     "source": "CRYPTO",
+     "widget": "crypto",
+     "config": {
+      "locale": "en",
+      "isTransparent": true,
+      "hasTopBar": true,
+      "isDataSetEnabled": false,
+      "isZoomEnabled": true,
+      "hasSymbolTooltip": true,
+      "isMonoSize": false,
+      "width": "100%",
+      "height": "100%",
+      "dataSource": "Crypto",
+      "blockSize": "market_cap_calc",
+      "blockColor": "24h_close_change|5"
+     },
+     "options": [
+      {
+       "value": "SPX500",
+       "label": "S&P 500"
+      },
+      {
+       "value": "NASDAQ100",
+       "label": "Nasdaq 100"
+      },
+      {
+       "value": "DJDJI",
+       "label": "Dow 30"
+      },
+      {
+       "value": "SENSEX",
+       "label": "SENSEX"
+      },
+      {
+       "value": "CRYPTO",
+       "label": "Crypto"
+      }
+     ]
+    },
+    "hideAmounts": false,
+    "baseCurrency": "INR",
+    "chartRange": "30D",
+    "loading": false,
+    "empty": false,
+    "updated": "10:32:11 AM",
+    "cards": [],
+    "columns": [
+     {
+      "label": "Symbol",
+      "align": "left"
+     },
+     {
+      "label": "Market",
+      "align": "left"
+     },
+     {
+      "label": "Qty",
+      "align": "right"
+     },
+     {
+      "label": "Avg Buy",
+      "align": "right"
+     },
+     {
+      "label": "LTP",
+      "align": "right"
+     },
+     {
+      "label": "Day %",
+      "align": "right"
+     },
+     {
+      "label": "Invested",
+      "align": "right"
+     },
+     {
+      "label": "Current",
+      "align": "right"
+     },
+     {
+      "label": "P/L",
+      "align": "right"
+     },
+     {
+      "label": "P/L %",
+      "align": "right"
+     }
+    ],
+    "rows": [],
+    "indices": [],
+    "indicesLoading": false,
+    "marketsTitle": "Markets",
+    "marketsNameLabel": "Index",
+    "marketsLevelLabel": "Level",
+    "warnings": []
    }
   }
  }
