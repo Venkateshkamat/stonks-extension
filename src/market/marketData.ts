@@ -3,6 +3,7 @@ import { FX_SYMBOL, COINS, DailyClose, IndexDef, INDICES, IntradayPoint, Provide
 import { normalizeSymbol } from '../symbols';
 import { FetchFn, HttpError } from './http';
 import { FinnhubProvider } from './finnhub';
+import { withRateLimitBackoff } from './rateLimit';
 import { YahooProvider } from './yahoo';
 
 const SPARSE_HISTORY_DAYS = 5;
@@ -68,9 +69,11 @@ export class MarketDataService {
   private finnhubIssue?: FinnhubIssue;
 
   constructor(opts: MarketDataOptions) {
-    this.yahoo = new YahooProvider(opts.fetch);
-    this.finnhub = new FinnhubProvider(opts.fetch, opts.getFinnhubKey);
     this.now = opts.now ?? Date.now;
+    // After an HTTP 429 a host is left alone for a while (30s doubling to 10 min) instead of being hit every cycle.
+    const fetchFn = withRateLimitBackoff(opts.fetch, this.now);
+    this.yahoo = new YahooProvider(fetchFn);
+    this.finnhub = new FinnhubProvider(fetchFn, opts.getFinnhubKey);
     this.quoteTtl = opts.quoteTtlMs ?? 10_000;
     this.historyTtl = opts.historyTtlMs ?? 60 * 60 * 1000;
     this.intradayTtl = opts.intradayTtlMs ?? INTRADAY_TTL_MS;

@@ -134,3 +134,36 @@ describe('MarketDataService', () => {
     assert.strictEqual(f.calls.length, 2);
   });
 });
+
+describe('MarketDataService rate limiting', () => {
+  it('stops calling Yahoo for a while after an HTTP 429, then resumes', async () => {
+    let t = 1_000_000;
+    let limited = true;
+    const f = mockFetch([['/chart/', () => (limited ? { status: 429 } : { body: fixture('yahoo/AAPL.1d.json') })]]);
+    const s = new MarketDataService({ fetch: f, getFinnhubKey: () => undefined, now: () => t });
+    await assert.rejects(s.getQuote({ symbol: 'AAPL', market: 'US' }, { fresh: true }));
+    assert.strictEqual(f.calls.length, 1);
+    t += 10_000;
+    await assert.rejects(s.getQuote({ symbol: 'AAPL', market: 'US' }, { fresh: true }), /429/);
+    await assert.rejects(s.getQuote({ symbol: 'MSFT', market: 'US' }, { fresh: true }), /429/);
+    assert.strictEqual(f.calls.length, 1, 'no network traffic while backing off');
+    limited = false;
+    t += 25_000; // past the 30s back-off
+    const q = await s.getQuote({ symbol: 'AAPL', market: 'US' }, { fresh: true });
+    assert.strictEqual(q.price, 347.725);
+    assert.strictEqual(f.calls.length, 2);
+  });
+
+  it('a Finnhub 429 sends later quotes straight to Yahoo without retrying Finnhub', async () => {
+    const f = mockFetch([['finnhub.io', { status: 429 }], YAHOO_AAPL_ROUTE]);
+    const s = new MarketDataService({ fetch: f, getFinnhubKey: () => 'k', now: () => 0 });
+    await s.getQuote({ symbol: 'AAPL', market: 'US' }, { fresh: true });
+    await s.getQuote({ symbol: 'AAPL', market: 'US' }, { fresh: true });
+    await s.getQuote({ symbol: 'AAPL', market: 'US' }, { fresh: true });
+    assert.strictEqual(f.calls.filter((c) => c.includes('finnhub.io')).length, 1);
+    assert.strictEqual(f.calls.filter((c) => c.includes('yahoo')).length, 3);
+    assert.strictEqual(s.getFinnhubIssue(), 'rate-limited');
+  });
+});
+
+const YAHOO_AAPL_ROUTE = ['/chart/AAPL?', { body: fixture('yahoo/AAPL.1d.json') }] as const;
