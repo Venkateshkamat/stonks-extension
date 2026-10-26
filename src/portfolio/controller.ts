@@ -165,6 +165,11 @@ export class PortfolioController implements Disposable {
     return this.current;
   }
 
+  /** The refresh interval currently in effect, in seconds. */
+  get currentRefreshIntervalSeconds(): number {
+    return this.settings.refreshIntervalSeconds;
+  }
+
   /** Starts the refresh loop (immediate refresh, then every refreshIntervalSeconds). */
   start(): Promise<void> {
     return this.refresh('start');
@@ -205,6 +210,11 @@ export class PortfolioController implements Disposable {
 
   async setBaseCurrency(currency: Currency): Promise<void> {
     await this.deps.settings.setBaseCurrency(currency);
+    this.notifySettingsChanged();
+  }
+
+  async setRefreshIntervalSeconds(seconds: number): Promise<void> {
+    await this.deps.settings.setRefreshIntervalSeconds(seconds);
     this.notifySettingsChanged();
   }
 

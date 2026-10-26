@@ -23,6 +23,7 @@ describe('package manifest', () => {
       'stonks.removeHolding',
       'stonks.setBaseCurrency',
       'stonks.setFinnhubApiKey',
+      'stonks.setRefreshInterval',
       'stonks.toggleHideAmounts',
     ]);
     for (const c of pkg.contributes.commands) assert.strictEqual(c.category, 'Stonks');

@@ -52,6 +52,11 @@
         "category": "Stonks"
       },
       {
+        "command": "stonks.setRefreshInterval",
+        "title": "Set Refresh Interval",
+        "category": "Stonks"
+      },
+      {
         "command": "stonks.refresh",
         "title": "Refresh",
         "category": "Stonks"

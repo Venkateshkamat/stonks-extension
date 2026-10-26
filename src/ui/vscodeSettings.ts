@@ -20,6 +20,10 @@ export class VsCodeSettings implements SettingsSource {
     return this.write('baseCurrency', value);
   }
 
+  setRefreshIntervalSeconds(value: number): Promise<void> {
+    return this.write('refreshIntervalSeconds', value);
+  }
+
   private async write(key: string, value: unknown): Promise<void> {
     const c = vscode.workspace.getConfiguration('stonks');
     // Respect a workspace-level override if one exists (otherwise the write would have no visible effect);

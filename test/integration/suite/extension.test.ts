@@ -73,7 +73,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
 
   it('registers every contributed command', async () => {
     const contributed: string[] = ext.packageJSON.contributes.commands.map((c: { command: string }) => c.command);
-    for (const id of ['stonks.setBaseCurrency']) assert.ok(contributed.includes(id), `manifest is missing ${id}`);
+    for (const id of ['stonks.setBaseCurrency', 'stonks.setRefreshInterval']) assert.ok(contributed.includes(id), `manifest is missing ${id}`);
     assert.ok(contributed.length >= 8, `expected the manifest to contribute commands, got ${contributed.length}`);
     const all = new Set(await vscode.commands.getCommands(true));
     const missing = contributed.filter((c) => !all.has(c));
@@ -147,6 +147,20 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
         await cfg().update('baseCurrency', undefined, vscode.ConfigurationTarget.Workspace);
       }
       await waitFor('baseCurrency back to INR', () => api.controller.snapshot.baseCurrency === 'INR');
+    });
+
+    it('setRefreshInterval writes stonks.refreshIntervalSeconds and reschedules the controller', async () => {
+      const cfg = () => vscode.workspace.getConfiguration('stonks');
+      assert.strictEqual(cfg().get('refreshIntervalSeconds'), 60);
+      try {
+        await vscode.commands.executeCommand('stonks.setRefreshInterval', 120);
+        await waitFor('refreshIntervalSeconds=120', () => cfg().get('refreshIntervalSeconds') === 120);
+        await waitFor('controller using 120s', () => api.controller.currentRefreshIntervalSeconds === 120);
+      } finally {
+        await cfg().update('refreshIntervalSeconds', undefined, vscode.ConfigurationTarget.Global);
+        await cfg().update('refreshIntervalSeconds', undefined, vscode.ConfigurationTarget.Workspace);
+      }
+      await waitFor('controller back to 60s', () => api.controller.currentRefreshIntervalSeconds === 60);
     });
 
     it('openPortfolio creates exactly one panel, even when called twice', async () => {

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { isRealDate, parseBuyDate, parsePositiveNumber, validateBuyDate, validateBuyPrice, validateQuantity } from '../../src/validation';
+import { isRealDate, parseBuyDate, parsePositiveNumber, parseRefreshInterval, validateBuyDate, validateBuyPrice, validateQuantity, validateRefreshInterval } from '../../src/validation';
 import { DEFAULT_SETTINGS, parseSettings } from '../../src/settings';
 import { formatMoney, formatPercent, formatSignedMoney } from '../../src/format';
 
@@ -53,6 +53,18 @@ describe('settings parsing', () => {
     assert.strictEqual(parseSettings({ baseCurrency: 'EUR' }).baseCurrency, 'INR');
     assert.strictEqual(parseSettings({ hideAmounts: true }).hideAmounts, true);
     assert.strictEqual(parseSettings({ hideAmounts: 'yes' }).hideAmounts, false);
+  });
+});
+
+describe('refresh interval validation', () => {
+  it('accepts whole seconds from 15 to one day', () => {
+    for (const ok of ['15', '60', ' 120 ', '86400']) assert.strictEqual(validateRefreshInterval(ok), undefined, ok);
+    assert.strictEqual(parseRefreshInterval(' 120 '), 120);
+  });
+
+  it('rejects too small, too large, fractional and non-numeric input', () => {
+    for (const bad of ['14', '0', '86401']) assert.ok(validateRefreshInterval(bad), bad);
+    for (const bad of ['', 'abc', '1.5', '-30', '30s', '1e3', '0x20']) assert.match(validateRefreshInterval(bad) ?? '', /whole number/, bad);
   });
 });
 

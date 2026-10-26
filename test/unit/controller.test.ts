@@ -103,6 +103,31 @@ describe('PortfolioController', () => {
     controller.dispose();
   });
 
+  it('setRefreshIntervalSeconds writes the setting and reschedules the timer', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const { store, controller, settings, fetch } = setup({ settings: { refreshIntervalSeconds: 600 } });
+      await store.add({ symbol: 'RELIANCE', market: 'NSE', quantity: 1, buyPrice: 1 });
+      await controller.start();
+      const n = () => fetch.calls.filter((c) => c.includes('RELIANCE.NS')).length;
+      const n0 = n();
+      assert.strictEqual(controller.currentRefreshIntervalSeconds, 600);
+      await controller.setRefreshIntervalSeconds(20);
+      assert.strictEqual(settings.value.refreshIntervalSeconds, 20);
+      assert.strictEqual(controller.currentRefreshIntervalSeconds, 20);
+      mock.timers.tick(19_000);
+      await new Promise((r) => setImmediate(r));
+      assert.strictEqual(n(), n0, 'no refresh before the new interval');
+      mock.timers.tick(1_000);
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      assert.strictEqual(n(), n0 + 1, 'refreshed after the new 20s interval, not the old 600s');
+      controller.dispose();
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
   it('re-bases instantly on a currency change when the fx rate is already known', async () => {
     const { store, controller } = setup();
     await store.add({ symbol: 'AAPL', market: 'US', quantity: 2, buyPrice: 300 });

@@ -25,4 +25,5 @@ export interface SettingsSource {
   get(): Settings;
   setHideAmounts(value: boolean): PromiseLike<void>;
   setBaseCurrency(value: Currency): PromiseLike<void>;
+  setRefreshIntervalSeconds(value: number): PromiseLike<void>;
 }

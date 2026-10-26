@@ -23,6 +23,9 @@ export class FakeSettings implements SettingsSource {
   async setHideAmounts(v: boolean): Promise<void> {
     this.value = { ...this.value, hideAmounts: v };
   }
+  async setRefreshIntervalSeconds(v: number): Promise<void> {
+    this.value = { ...this.value, refreshIntervalSeconds: v };
+  }
   async setBaseCurrency(v: Currency): Promise<void> {
     this.value = { ...this.value, baseCurrency: v };
   }

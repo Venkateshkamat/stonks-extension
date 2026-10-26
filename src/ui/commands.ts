@@ -7,7 +7,7 @@ import { HoldingsStore } from '../portfolio/store';
 import { nativeCurrency, normalizeSymbol, validateSymbol } from '../symbols';
 import { Currency, Holding, Market, Quote } from '../types';
 import { errorMessage } from '../util/async';
-import { parseBuyDate, parseQuantity, validateBuyDate, validateBuyPrice, validateQuantity, parsePositiveNumber } from '../validation';
+import { parseBuyDate, parseQuantity, validateBuyDate, validateBuyPrice, validateQuantity, parsePositiveNumber, parseRefreshInterval, validateRefreshInterval } from '../validation';
 import { FinnhubKeyManager } from './apiKey';
 
 export interface CommandDeps {
@@ -42,6 +42,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     reg('stonks.removeHolding', (id?: unknown) => removeHolding(deps, typeof id === 'string' ? id : undefined)),
     reg('stonks.toggleHideAmounts', () => deps.controller.toggleHideAmounts()),
     reg('stonks.setBaseCurrency', (value?: unknown) => setBaseCurrency(deps, value)),
+    reg('stonks.setRefreshInterval', (value?: unknown) => setRefreshInterval(deps, value)),
     reg('stonks.refresh', () => deps.controller.refresh('manual')),
     reg('stonks.setFinnhubApiKey', () => deps.keys.setKey()),
     reg('stonks.clearFinnhubApiKey', () => deps.keys.clearKey()),
@@ -70,6 +71,28 @@ export async function setBaseCurrency(deps: CommandDeps, value?: unknown): Promi
   }
   if (!currency || currency === deps.controller.snapshot.baseCurrency) return;
   await deps.controller.setBaseCurrency(currency);
+}
+
+/**
+ * Asks for the refresh interval in seconds (integer >= 15) and writes `stonks.refreshIntervalSeconds`.
+ * A number (or numeric string) argument that passes validation skips the InputBox (tests / automation).
+ */
+export async function setRefreshInterval(deps: CommandDeps, value?: unknown): Promise<void> {
+  let seconds: number | undefined;
+  const given = typeof value === 'number' || typeof value === 'string' ? String(value) : undefined;
+  if (given !== undefined && validateRefreshInterval(given) === undefined) seconds = parseRefreshInterval(given);
+  else {
+    const input = await vscode.window.showInputBox({
+      title: 'Stonks: Set Refresh Interval',
+      prompt: 'How often to refresh quotes, in seconds (minimum 15)',
+      value: String(deps.controller.currentRefreshIntervalSeconds),
+      validateInput: validateRefreshInterval,
+    });
+    if (input === undefined) return;
+    seconds = parseRefreshInterval(input);
+  }
+  if (seconds === deps.controller.currentRefreshIntervalSeconds) return;
+  await deps.controller.setRefreshIntervalSeconds(seconds);
 }
 
 /** Fetches a fresh quote to validate a symbol. Returns undefined if the user aborted or rejected it. */

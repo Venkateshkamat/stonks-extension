@@ -1,3 +1,5 @@
+import { MIN_REFRESH_SECONDS } from './settings';
+
 /** Input validators for the add/edit holding flows. Each returns an error message or undefined when valid. */
 
 export function parsePositiveNumber(input: string): number | undefined {
@@ -45,4 +47,20 @@ export function validateBuyDate(input: string, today: string = new Date().toISOS
 export function parseBuyDate(input: string): string | undefined {
   const s = input.trim();
   return s === '' ? undefined : s;
+}
+
+export const MAX_REFRESH_SECONDS = 86_400;
+
+/** Refresh interval in whole seconds: an integer >= 15 (and <= one day). */
+export function validateRefreshInterval(input: string): string | undefined {
+  const s = input.trim();
+  if (!/^\d+$/.test(s)) return `Enter a whole number of seconds (minimum ${MIN_REFRESH_SECONDS})`;
+  const n = Number(s);
+  if (n < MIN_REFRESH_SECONDS) return `Minimum refresh interval is ${MIN_REFRESH_SECONDS} seconds`;
+  if (n > MAX_REFRESH_SECONDS) return `Maximum refresh interval is ${MAX_REFRESH_SECONDS} seconds (one day)`;
+  return undefined;
+}
+
+export function parseRefreshInterval(input: string): number {
+  return Number(input.trim());
 }
