@@ -15,7 +15,7 @@ export interface CommandDeps {
   market: MarketDataService;
   controller: PortfolioController;
   keys: FinnhubKeyManager;
-  /** Opens the portfolio panel (replaced by the webview in the next phase). */
+  /** Opens (or reveals) the portfolio panel. */
   openPortfolio: () => void;
 }
 

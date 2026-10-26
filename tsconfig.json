@@ -15,6 +15,6 @@
     "noEmit": true,
     "types": ["node", "mocha"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts", "dev/**/*.ts"],
   "exclude": ["node_modules", "out", "dist"]
 }

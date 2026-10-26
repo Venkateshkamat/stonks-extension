@@ -1,0 +1,313 @@
+:root {
+  --gain: var(--vscode-charts-green, var(--vscode-testing-iconPassed, #3fb950));
+  --loss: var(--vscode-charts-red, var(--vscode-testing-iconFailed, #f85149));
+  --accent: var(--vscode-charts-blue, var(--vscode-textLink-foreground, #3794ff));
+  --warn: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow, #cca700));
+  --muted: var(--vscode-descriptionForeground, #8b949e);
+  --border: var(--vscode-panel-border, var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35)));
+  --card-bg: var(--vscode-editorWidget-background, var(--vscode-sideBar-background, transparent));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px 24px 32px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  line-height: 1.4;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.gain {
+  color: var(--gain);
+}
+.loss {
+  color: var(--loss);
+}
+.muted {
+  color: var(--muted);
+}
+
+/* ---- top bar ---- */
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+h1 {
+  margin: 0;
+  font-size: 1.6em;
+  font-weight: 600;
+}
+.meta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.92em;
+}
+.meta .sep {
+  margin: 0 6px;
+  opacity: 0.6;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, var(--accent));
+  outline-offset: 1px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+}
+.btn:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+.btn.large {
+  padding: 6px 16px;
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+.icon-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+.icon-btn.on {
+  background: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.3));
+}
+.icon-btn.danger:hover {
+  color: var(--loss);
+}
+svg.icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.spin svg.icon {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- summary cards ---- */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+}
+.card .label {
+  color: var(--muted);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.card .main {
+  margin-top: 4px;
+  font-size: 1.5em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.card .sub {
+  font-variant-numeric: tabular-nums;
+}
+.status-msg {
+  padding: 12px 0;
+  color: var(--muted);
+}
+
+.warnings {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--warn);
+  font-size: 0.92em;
+}
+.warnings li::before {
+  content: '\26A0\00A0';
+}
+
+/* ---- sections ---- */
+section {
+  margin-top: 28px;
+}
+h2 {
+  margin: 0 0 10px;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+h3 {
+  margin: 0 0 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---- tables ---- */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+th,
+td {
+  padding: 7px 12px;
+  white-space: nowrap;
+  text-align: left;
+}
+th.right,
+td.right {
+  text-align: right;
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85em;
+  border-bottom: 1px solid var(--border);
+}
+tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+tbody tr.has-error td {
+  border-bottom: none;
+}
+tbody tr.error-row td {
+  border-top: none;
+  padding-top: 0;
+  color: var(--warn);
+  font-size: 0.9em;
+  white-space: normal;
+}
+tbody tr:hover td {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+td.symbol {
+  font-weight: 600;
+}
+td.actions {
+  width: 1%;
+  padding: 3px 8px;
+  text-align: right;
+}
+td.actions .icon-btn {
+  opacity: 0.55;
+}
+tr:hover td.actions .icon-btn,
+td.actions .icon-btn:focus-visible {
+  opacity: 1;
+}
+
+/* ---- chart ---- */
+.chart-box {
+  position: relative;
+  height: 280px;
+  padding: 10px 12px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+}
+.chart-box canvas {
+  display: block;
+}
+.chart-msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.chart-errors {
+  margin-top: 6px;
+  color: var(--warn);
+  font-size: 0.9em;
+}
+.hidden {
+  display: none !important;
+}
+
+/* ---- indices ---- */
+.index-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+.index-groups .table-wrap {
+  margin-top: 0;
+}
+
+/* ---- empty state ---- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+.empty .title {
+  font-size: 1.2em;
+  font-weight: 600;
+}
+.empty .hint {
+  margin-bottom: 8px;
+  color: var(--muted);
+}

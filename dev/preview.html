@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stonks panel preview (dev only)</title>
+<!--
+  Dev harness: renders the real webview (dist/media/panel.js + panel.css + Chart.js) in a plain browser with a
+  stubbed acquireVsCodeApi and fake --vscode-* theme variables. Not shipped in the .vsix.
+
+  1. npm run compile            (copies media/ and Chart.js into dist/media/)
+  2. open dev/preview.html      (file:// works)
+
+  Query params: ?variant=shown|hidden|usd|errors|loading|empty  &theme=dark|light
+  Mock data comes from dev/preview-data.js (npm run preview:data regenerates it from the real model builders).
+-->
+<link rel="stylesheet" href="../dist/media/panel.css">
+<style>
+  #devbar {
+    position: fixed; right: 12px; bottom: 12px; z-index: 10; display: flex; gap: 8px; align-items: center;
+    padding: 6px 10px; border-radius: 6px; font: 12px system-ui, sans-serif;
+    background: rgba(30, 30, 30, 0.92); color: #ddd; border: 1px solid #555;
+  }
+  #devbar select, #devbar button { font: inherit; }
+  #devlog { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9cdcfe; }
+</style>
+</head>
+<body class="vscode-dark">
+<div id="app"></div>
+
+<div id="devbar">
+  <label>Variant
+    <select id="variant">
+      <option>shown</option><option>hidden</option><option>usd</option><option>errors</option><option>loading</option><option>empty</option>
+    </select>
+  </label>
+  <label>Theme
+    <select id="theme"><option>dark</option><option>light</option></select>
+  </label>
+  <button id="toggle" type="button">Toggle hideAmounts</button>
+  <span id="devlog" title="Last message posted by the webview"></span>
+</div>
+
+<script src="preview-data.js"></script>
+<script>
+(function () {
+  'use strict';
+  var params = new URLSearchParams(location.search);
+  var MOCK = window.STONKS_MOCK;
+  var current = MOCK[params.get('variant')] ? params.get('variant') : 'shown';
+
+  var THEMES = {
+    dark: {
+      '--vscode-font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      '--vscode-font-size': '13px',
+      '--vscode-foreground': '#cccccc',
+      '--vscode-descriptionForeground': '#9d9d9d',
+      '--vscode-editor-background': '#1e1e1e',
+      '--vscode-panel-border': 'rgba(128, 128, 128, 0.35)',
+      '--vscode-editorWidget-background': '#252526',
+      '--vscode-editorWidget-border': '#454545',
+      '--vscode-charts-green': '#89d185',
+      '--vscode-charts-red': '#f14c4c',
+      '--vscode-charts-blue': '#3794ff',
+      '--vscode-charts-yellow': '#cca700',
+      '--vscode-editorWarning-foreground': '#cca700',
+      '--vscode-button-background': '#0e639c',
+      '--vscode-button-foreground': '#ffffff',
+      '--vscode-button-hoverBackground': '#1177bb',
+      '--vscode-toolbar-hoverBackground': 'rgba(90, 93, 94, 0.31)',
+      '--vscode-toolbar-activeBackground': 'rgba(99, 102, 103, 0.31)',
+      '--vscode-list-hoverBackground': '#2a2d2e',
+      '--vscode-focusBorder': '#007fd4',
+      '--vscode-icon-foreground': '#c5c5c5',
+      '--vscode-textLink-foreground': '#3794ff',
+      '--vscode-editorHoverWidget-background': '#252526',
+      '--vscode-editorHoverWidget-foreground': '#cccccc',
+      '--vscode-editorHoverWidget-border': '#454545'
+    },
+    light: {
+      '--vscode-font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      '--vscode-font-size': '13px',
+      '--vscode-foreground': '#3b3b3b',
+      '--vscode-descriptionForeground': '#717171',
+      '--vscode-editor-background': '#ffffff',
+      '--vscode-panel-border': 'rgba(128, 128, 128, 0.35)',
+      '--vscode-editorWidget-background': '#f8f8f8',
+      '--vscode-editorWidget-border': '#c8c8c8',
+      '--vscode-charts-green': '#388a34',
+      '--vscode-charts-red': '#e51400',
+      '--vscode-charts-blue': '#1a85ff',
+      '--vscode-charts-yellow': '#bf8803',
+      '--vscode-editorWarning-foreground': '#bf8803',
+      '--vscode-button-background': '#007acc',
+      '--vscode-button-foreground': '#ffffff',
+      '--vscode-button-hoverBackground': '#0062a3',
+      '--vscode-toolbar-hoverBackground': 'rgba(184, 184, 184, 0.31)',
+      '--vscode-toolbar-activeBackground': 'rgba(166, 166, 166, 0.31)',
+      '--vscode-list-hoverBackground': '#e8e8e8',
+      '--vscode-focusBorder': '#0090f1',
+      '--vscode-icon-foreground': '#424242',
+      '--vscode-textLink-foreground': '#006ab1',
+      '--vscode-editorHoverWidget-background': '#f3f3f3',
+      '--vscode-editorHoverWidget-foreground': '#3b3b3b',
+      '--vscode-editorHoverWidget-border': '#c8c8c8'
+    }
+  };
+
+  function applyTheme(name) {
+    var vars = THEMES[name] || THEMES.dark;
+    Object.keys(vars).forEach(function (k) { document.documentElement.style.setProperty(k, vars[k]); });
+    document.body.className = name === 'light' ? 'vscode-light' : 'vscode-dark'; // like VS Code: the webview re-themes its chart
+    document.getElementById('theme').value = name;
+  }
+
+  function log(text) { document.getElementById('devlog').textContent = text; }
+
+  function deliver(data) { window.dispatchEvent(new MessageEvent('message', { data: data })); }
+
+  function sendState(name, opts) {
+    var v = MOCK[name];
+    var model = v.model;
+    if (opts && opts.loading) model = Object.assign({}, model, { loading: true });
+    deliver({ type: 'state', model: model });
+    if (v.chart === undefined) return;
+    // The real extension posts `chart: null` while history loads, then the chart.
+    deliver({ type: 'history', chart: null });
+    setTimeout(function () { if (current === name) deliver({ type: 'history', chart: v.chart }); }, 250);
+  }
+
+  function setVariant(name) {
+    current = name;
+    document.getElementById('variant').value = name;
+    sendState(name);
+  }
+
+  // Stub of the VS Code webview API.
+  window.acquireVsCodeApi = function () {
+    return {
+      postMessage: function (msg) {
+        log(JSON.stringify(msg));
+        console.log('[webview -> extension]', msg);
+        if (msg.type === 'ready') setTimeout(function () { sendState(current); }, 0);
+        else if (msg.type === 'action' && msg.action === 'toggleHide') setVariant(current === 'hidden' ? 'shown' : 'hidden');
+        else if (msg.type === 'action' && msg.action === 'refresh') {
+          var name = current;
+          deliver({ type: 'state', model: Object.assign({}, MOCK[name].model, { loading: true }) });
+          setTimeout(function () { if (current === name) deliver({ type: 'state', model: MOCK[name].model }); }, 800);
+        }
+      },
+      getState: function () { return undefined; },
+      setState: function () {}
+    };
+  };
+
+  document.getElementById('variant').addEventListener('change', function (e) { setVariant(e.target.value); });
+  document.getElementById('theme').addEventListener('change', function (e) { applyTheme(e.target.value); });
+  document.getElementById('toggle').addEventListener('click', function () { setVariant(current === 'hidden' ? 'shown' : 'hidden'); });
+
+  applyTheme(params.get('theme') === 'light' ? 'light' : 'dark');
+  document.getElementById('variant').value = current;
+})();
+</script>
+<script src="../dist/media/chart.umd.min.js"></script>
+<script src="../dist/media/panel.js"></script>
+</body>
+</html>

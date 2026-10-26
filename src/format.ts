@@ -26,3 +26,33 @@ export function formatPercent(p: number): string {
   if (r === 0) return '0.00%';
   return `${r > 0 ? '+' : '-'}${Math.abs(r).toFixed(2)}%`;
 }
+
+export function currencyLocale(c: Currency): string {
+  return LOCALE[c];
+}
+
+/** Plain grouped number with a fixed number of decimals (no currency symbol): 24,350.50 */
+export function formatNumber(n: number, locale = 'en-US', decimals = 2): string {
+  const abs = new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(Math.abs(n));
+  const sign = n < 0 && Number(abs.replace(/,/g, '')) !== 0 ? '-' : '';
+  return `${sign}${abs}`;
+}
+
+/** Always-signed plain number: +123.45 / -123.45 / 0.00 */
+export function formatSignedNumber(n: number, locale = 'en-US', decimals = 2): string {
+  const s = formatNumber(n, locale, decimals);
+  if (s.startsWith('-')) return s;
+  return Number(s.replace(/,/g, '')) === 0 ? s : `+${s}`;
+}
+
+/** Per-unit price: 2 decimals, but up to 6 for sub-1 values so tiny crypto prices stay readable. */
+export function formatPrice(amount: number, currency: Currency): string {
+  if (Math.abs(amount) >= 1 || amount === 0) return formatMoney(amount, currency);
+  const abs = new Intl.NumberFormat(LOCALE[currency], { minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(Math.abs(amount));
+  return `${amount < 0 ? '-' : ''}${SYMBOL[currency]}${abs}`;
+}
+
+/** Share / unit quantity: grouped, up to 8 decimals, no trailing zeros. */
+export function formatQuantity(q: number, currency: Currency): string {
+  return new Intl.NumberFormat(LOCALE[currency], { minimumFractionDigits: 0, maximumFractionDigits: 8 }).format(q);
+}

@@ -4,6 +4,7 @@ import { PortfolioController } from './portfolio/controller';
 import { HOLDINGS_KEY, HoldingsStore } from './portfolio/store';
 import { FinnhubKeyManager } from './ui/apiKey';
 import { registerCommands } from './ui/commands';
+import { PortfolioPanel } from './ui/portfolioPanel';
 import { StatusBarController } from './ui/statusBar';
 import { VsCodeSettings } from './ui/vscodeSettings';
 
@@ -22,11 +23,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const store = new HoldingsStore(context.globalState);
   const controller = new PortfolioController({ store, market, settings: new VsCodeSettings() });
   const statusBar = new StatusBarController(controller);
+  const panel = new PortfolioPanel(context.extensionUri, controller);
 
   context.subscriptions.push(
     keys,
     controller,
     statusBar,
+    panel,
     keys.onDidChange(() => {
       market.clearAll();
       void controller.refresh('key');
@@ -39,8 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       market,
       controller,
       keys,
-      // Replaced by the webview panel in the next phase.
-      openPortfolio: () => void vscode.window.showInformationMessage('Portfolio panel coming soon'),
+      openPortfolio: () => panel.show(),
     }),
   );
 

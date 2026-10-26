@@ -95,6 +95,7 @@
     "package": "tsc --noEmit && node esbuild.js --production",
     "build:tests": "tsc -p tsconfig.json --outDir out --noEmit false",
     "test": "npm run build:tests && mocha",
+    "preview:data": "npm run build:tests && node out/dev/generate-preview-data.js",
     "test:live": "npm run build:tests && node out/test/live/smoke.js"
   },
   "dependencies": {
