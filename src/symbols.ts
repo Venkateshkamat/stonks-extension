@@ -56,3 +56,11 @@ export function finnhubSymbol(symbol: string, market: Market): string | undefine
       return undefined;
   }
 }
+
+/** Portfolio subsets that are shown / totalled separately: stocks (NSE, BSE, US) and crypto. */
+export type PortfolioGroup = 'stocks' | 'crypto';
+export const PORTFOLIO_GROUPS: readonly PortfolioGroup[] = ['stocks', 'crypto'];
+
+export function marketGroup(market: Market): PortfolioGroup {
+  return market === 'CRYPTO' ? 'crypto' : 'stocks';
+}

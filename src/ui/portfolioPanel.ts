@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import { buildChartModel, ChartModel } from '../panel/chartModel';
+import { INTRADAY_TTL_MS } from '../market/marketData';
+import { PanelPrefs } from '../panel/prefs';
 import { buildPanelModel, historyKey } from '../panel/model';
 import { buildHtml, FromWebview, makeNonce, parseWebviewMessage, ToWebview } from '../panel/protocol';
 import { PortfolioController, PortfolioSnapshot } from '../portfolio/controller';
+import { ChartRange } from '../types';
 import { errorMessage } from '../util/async';
 
 const VIEW_TYPE = 'stonks.portfolio';
@@ -27,6 +30,8 @@ export interface PanelDiagnostics {
   holdingRows?: number;
   /** Number of buttons in the base-currency toggle (2 when the header rendered). */
   currencyButtons?: number;
+  /** Number of buttons in the 1D | 15D | 30D selector (3 when the chart section rendered). */
+  rangeButtons?: number;
   /** Uncaught errors / unhandled rejections reported by the webview. */
   errors: string[];
 }
@@ -42,12 +47,34 @@ export class PortfolioPanel implements vscode.Disposable {
   private histKey?: string;
   private chart?: ChartModel;
   private histSeq = 0;
+  /** When the current history was (re)loaded; the 1D range reloads at most every INTRADAY_TTL_MS. */
+  private loadedAt = 0;
   private diag: PanelDiagnostics = { ready: false, errors: [] };
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly controller: PortfolioController,
+    private readonly prefs: PanelPrefs,
   ) {}
+
+  /** The selected chart range (persisted). */
+  get range(): ChartRange {
+    return this.prefs.chartRange;
+  }
+
+  /** Changes and persists the chart range, then reloads the chart. Used by the webview selector and by tests. */
+  async setRange(range: ChartRange): Promise<void> {
+    if (range === this.prefs.chartRange) return;
+    await this.prefs.setChartRange(range);
+    const s = this.controller.snapshot;
+    this.post({ type: 'state', model: buildPanelModel(s, { range }) });
+    this.ensureHistory(s, true);
+  }
+
+  /** The chart currently shown (or undefined while loading / closed); exposed for the integration tests. */
+  get currentChart(): ChartModel | undefined {
+    return this.chart;
+  }
 
   /** True while the panel is open. */
   get isOpen(): boolean {
@@ -103,6 +130,7 @@ export class PortfolioPanel implements vscode.Disposable {
       this.diag.chartRendered = msg.chartRendered;
       this.diag.holdingRows = msg.holdingRows;
       this.diag.currencyButtons = msg.currencyButtons;
+      this.diag.rangeButtons = msg.rangeButtons;
       return;
     }
     if (msg.type === 'error') {
@@ -114,9 +142,13 @@ export class PortfolioPanel implements vscode.Disposable {
       this.diag.ready = true;
       // A (re)loaded webview starts empty: send everything again.
       const s = this.controller.snapshot;
-      this.post({ type: 'state', model: buildPanelModel(s) });
-      if (this.chart && this.chart.key === historyKey(s)) this.post({ type: 'history', chart: this.chart });
+      this.post({ type: 'state', model: buildPanelModel(s, { range: this.prefs.chartRange }) });
+      if (this.chart && this.chart.key === historyKey(s, this.prefs.chartRange)) this.post({ type: 'history', chart: this.chart });
       else this.ensureHistory(s, true);
+      return;
+    }
+    if (msg.type === 'setRange') {
+      await this.setRange(msg.range);
       return;
     }
     if (msg.type === 'setCurrency') {
@@ -137,11 +169,15 @@ export class PortfolioPanel implements vscode.Disposable {
   }
 
   private push(s: PortfolioSnapshot): void {
-    this.post({ type: 'state', model: buildPanelModel(s) });
+    this.post({ type: 'state', model: buildPanelModel(s, { range: this.prefs.chartRange }) });
     this.ensureHistory(s, false);
   }
 
-  /** (Re)loads the 30-day series when holdings / hideAmounts / baseCurrency changed (not on plain quote refreshes). */
+  /**
+   * (Re)loads the chart series when holdings / hideAmounts / baseCurrency / range changed (not on plain quote
+   * refreshes). While 1D is selected it also reloads quietly (keeping the old chart on screen) on refresh cycles,
+   * at most every INTRADAY_TTL_MS.
+   */
   private ensureHistory(s: PortfolioSnapshot, force: boolean): void {
     if (!s.hasHoldings) {
       this.histKey = undefined;
@@ -149,19 +185,29 @@ export class PortfolioPanel implements vscode.Disposable {
       this.histSeq++;
       return;
     }
-    const key = historyKey(s);
-    if (!force && key === this.histKey) return;
+    const range = this.prefs.chartRange;
+    const key = historyKey(s, range);
+    const sameKey = key === this.histKey;
+    const quiet = !force && sameKey && range === '1D' && Date.now() - this.loadedAt >= INTRADAY_TTL_MS;
+    if (!force && sameKey && !quiet) return;
     this.histKey = key;
-    this.chart = undefined;
+    this.loadedAt = Date.now();
+    if (!quiet) {
+      this.chart = undefined;
+      this.post({ type: 'history', chart: null });
+    }
     const seq = ++this.histSeq;
-    this.post({ type: 'history', chart: null });
     this.controller
-      .getHistorySeries()
+      .getHistorySeries(range)
       .then((series) => buildChartModel(series, key))
-      .catch((e) => buildChartModel({ baseCurrency: s.baseCurrency, hideAmounts: s.hideAmounts, points: [], errors: [errorMessage(e)] }, key))
+      .catch((e) =>
+        buildChartModel({ range, baseCurrency: s.baseCurrency, hideAmounts: s.hideAmounts, points: [], errors: [errorMessage(e)] }, key),
+      )
       .then((chart) => {
         if (seq !== this.histSeq || !this.panel) return; // superseded or panel closed
+        if (quiet && chart.values.length === 0 && this.chart) return; // keep the last good chart on a failed quiet reload
         this.chart = chart;
+        this.loadedAt = Date.now();
         this.post({ type: 'history', chart });
       });
   }

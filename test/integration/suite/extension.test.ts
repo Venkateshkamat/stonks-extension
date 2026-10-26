@@ -188,7 +188,34 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       assert.strictEqual(d.chartLib, true, 'Chart.js did not load in the webview (typeof Chart === "undefined")');
       assert.strictEqual(d.holdingRows, 3, 'the holdings table should show the 3 seeded holdings');
       assert.strictEqual(d.currencyButtons, 2, 'the INR | USD toggle should be rendered in the header');
+      assert.strictEqual(d.rangeButtons, 3, 'the 1D | 15D | 30D selector should be rendered above the chart');
+      assert.strictEqual(api.panel.range, '30D', 'default range');
+      assert.strictEqual(api.panel.currentChart?.range, '30D');
       assert.strictEqual(d.chartRendered, true, 'the chart was not rendered (history fetch failed or chart code threw)');
+    });
+
+    it('switching the chart range to 1D and 15D loads the matching chart without webview errors, and persists the choice', async function () {
+      this.timeout(NETWORK_TIMEOUT + 10_000);
+      try {
+        await api.panel.setRange('1D');
+        const chart1d = await waitFor('1D chart', () => (api.panel.currentChart?.range === '1D' ? api.panel.currentChart : undefined), NETWORK_TIMEOUT);
+        assert.match(chart1d.title, /^1-day portfolio value/);
+        assert.ok(chart1d.values.length > 0, `1D chart has no points: ${chart1d.message ?? ''} ${chart1d.errors.join('; ')}`);
+        assert.ok(chart1d.labels.every((l) => /^\d{2}:\d{2}$/.test(l)), 'the 1D x axis shows times');
+        assert.ok(chart1d.values.length <= 120, 'at most ~96 15-minute bars plus partial bars');
+        await waitFor('chart rendered for 1D', () => api.panel.diagnostics.chartRendered === true);
+        assert.strictEqual(api.panel.range, '1D');
+
+        await api.panel.setRange('15D');
+        const chart15 = await waitFor('15D chart', () => (api.panel.currentChart?.range === '15D' ? api.panel.currentChart : undefined), NETWORK_TIMEOUT);
+        assert.match(chart15.title, /^15-day portfolio value/);
+        assert.ok(chart15.values.length > 5 && chart15.values.length <= 16);
+        assert.deepStrictEqual(api.panel.diagnostics.errors, [], 'webview reported errors after switching ranges');
+        assert.strictEqual(api.panel.diagnostics.rangeButtons, 3);
+      } finally {
+        await api.panel.setRange('30D'); // restore the default so persisted state does not leak
+      }
+      assert.strictEqual(api.panel.range, '30D');
     });
 
     it('closing the panel and reopening it creates a fresh single panel', async () => {

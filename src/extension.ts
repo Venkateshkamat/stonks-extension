@@ -4,6 +4,7 @@ import { PortfolioController } from './portfolio/controller';
 import { HOLDINGS_KEY, HoldingsStore } from './portfolio/store';
 import { FinnhubKeyManager } from './ui/apiKey';
 import { registerCommands } from './ui/commands';
+import { PanelPrefs } from './panel/prefs';
 import { PortfolioPanel } from './ui/portfolioPanel';
 import { StatusBarController } from './ui/statusBar';
 import { VsCodeSettings } from './ui/vscodeSettings';
@@ -24,7 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
   const store = new HoldingsStore(context.globalState);
   const controller = new PortfolioController({ store, market, settings: new VsCodeSettings() });
   const statusBar = new StatusBarController(controller);
-  const panel = new PortfolioPanel(context.extensionUri, controller);
+  const panel = new PortfolioPanel(context.extensionUri, controller, new PanelPrefs(context.globalState));
 
   context.subscriptions.push(
     keys,

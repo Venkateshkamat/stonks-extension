@@ -12,8 +12,8 @@ describe('parseWebviewMessage', () => {
   });
 
   it('accepts diag and error reports from the webview, normalising their fields', () => {
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2 });
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0, rangeButtons: 0 });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 'boom' }), { type: 'error', message: 'boom' });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 42 }), { type: 'error', message: 'unknown error' });
     const long = parseWebviewMessage({ type: 'error', message: 'x'.repeat(5000) });
@@ -32,6 +32,11 @@ describe('parseWebviewMessage', () => {
     assert.deepStrictEqual(parseWebviewMessage({ type: 'setCurrency', currency: 'USD' }), { type: 'setCurrency', currency: 'USD' });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'setCurrency', currency: 'INR', x: 1 }), { type: 'setCurrency', currency: 'INR' });
     for (const bad of ['EUR', '', 5, undefined, null]) assert.strictEqual(parseWebviewMessage({ type: 'setCurrency', currency: bad }), undefined);
+  });
+
+  it('accepts only 1D / 15D / 30D for setRange', () => {
+    for (const range of ['1D', '15D', '30D']) assert.deepStrictEqual(parseWebviewMessage({ type: 'setRange', range, x: 1 }), { type: 'setRange', range });
+    for (const bad of ['7D', '1d', '', 30, undefined, null]) assert.strictEqual(parseWebviewMessage({ type: 'setRange', range: bad }), undefined);
   });
 
   it('rejects anything unexpected', () => {

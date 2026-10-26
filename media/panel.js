@@ -24,6 +24,7 @@
       type: 'diag',
       chartLib: typeof Chart !== 'undefined',
       chartRendered: !!chart,
+      rangeButtons: elRange.querySelectorAll('.seg-btn').length,
       holdingRows: elHoldings.querySelectorAll('tbody tr:not(.error-row)').length,
       currencyButtons: elTop.querySelectorAll('.currency-toggle .seg-btn').length,
     });
@@ -125,12 +126,15 @@
   var elChartSection = h('section');
   var elIndices = h('section');
 
+  var RANGE_WORDS = { '1D': '1-day', '15D': '15-day', '30D': '30-day' };
   var chartTitle = h('h2', { text: '30-day chart' });
-  var chartCanvas = h('canvas', { role: 'img', 'aria-label': '30-day portfolio chart' });
+  var elRange = h('div', { class: 'range-slot' });
+  var chartHead = h('div', { class: 'section-head' }, chartTitle, elRange);
+  var chartCanvas = h('canvas', { role: 'img', 'aria-label': 'Portfolio value chart' });
   var chartMsg = h('div', { class: 'chart-msg', text: 'Loading chart...' });
   var chartErrors = h('div', { class: 'chart-errors' });
   var chartBox = h('div', { class: 'chart-box' }, chartCanvas, chartMsg);
-  elChartSection.appendChild(chartTitle);
+  elChartSection.appendChild(chartHead);
   elChartSection.appendChild(chartBox);
   elChartSection.appendChild(chartErrors);
 
@@ -348,8 +352,23 @@
     }
   }
 
+  function renderRangeSelector() {
+    elRange.replaceChildren(
+      segmented(
+        'Chart range',
+        [{ value: '1D', label: '1D', title: 'Last 24 hours' }, { value: '15D', label: '15D', title: 'Last 15 days' }, { value: '30D', label: '30D', title: 'Last 30 days' }],
+        model.chartRange,
+        function (r) { vscode.postMessage({ type: 'setRange', range: r }); },
+        'range-toggle',
+      ),
+    );
+    // Until the chart for this range arrives, name the range in the heading.
+    if (!chartModel || chartModel.range !== model.chartRange) chartTitle.textContent = (RANGE_WORDS[model.chartRange] || '30-day') + ' chart';
+  }
+
   function renderChartVisibility() {
     var showSection = model && !model.empty;
+    if (showSection) renderRangeSelector();
     elChartSection.classList.toggle('hidden', !showSection);
     if (showSection && !chart && chartModel === undefined) setChartMessage('Loading chart...');
   }
@@ -364,7 +383,7 @@
     destroyChart();
     chartErrors.textContent = '';
     if (chartModel === undefined || chartModel === null) {
-      chartTitle.textContent = '30-day chart';
+      chartTitle.textContent = (RANGE_WORDS[(model && model.chartRange) || '30D'] || '30-day') + ' chart';
       setChartMessage('Loading chart...');
       return;
     }

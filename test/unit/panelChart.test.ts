@@ -4,6 +4,7 @@ import { HistorySeries } from '../../src/portfolio/controller';
 
 function series(overrides: Partial<HistorySeries> = {}): HistorySeries {
   return {
+    range: '30D',
     baseCurrency: 'INR',
     hideAmounts: false,
     points: [

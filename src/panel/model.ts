@@ -8,7 +8,8 @@ import {
   formatSignedNumber,
 } from '../format';
 import { HoldingRow, PortfolioSnapshot } from '../portfolio/controller';
-import { nativeCurrency } from '../symbols';
+import { nativeCurrency, PortfolioGroup } from '../symbols';
+import { ChartRange, DEFAULT_CHART_RANGE } from '../types';
 
 /** Serializable view model posted to the webview. All formatting happens here so the webview stays dumb. */
 
@@ -57,6 +58,8 @@ export interface IndexGroupModel {
 export interface PanelModel {
   hideAmounts: boolean;
   baseCurrency: string;
+  /** Selected chart range (drives the 1D | 15D | 30D selector). */
+  chartRange: ChartRange;
   loading: boolean;
   /** True when there are no holdings (show the empty state). */
   empty: boolean;
@@ -79,6 +82,8 @@ export interface PanelModel {
 export interface PanelModelOptions {
   /** Formats the last-updated epoch ms. Defaults to the local time string. */
   formatTime?: (ms: number) => string;
+  /** Selected chart range; defaults to 30D. */
+  range?: ChartRange;
 }
 
 const MUTED: Cell = { text: '--', tone: 'muted' };
@@ -191,6 +196,7 @@ export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = 
   return {
     hideAmounts: s.hideAmounts,
     baseCurrency: s.baseCurrency,
+    chartRange: opts.range ?? DEFAULT_CHART_RANGE,
     loading: s.loading,
     empty: !s.hasHoldings,
     updated: s.lastUpdated !== undefined ? formatTime(s.lastUpdated) : undefined,
@@ -206,12 +212,20 @@ export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = 
   };
 }
 
-/** Identity of everything the 30-day chart depends on. Quote refreshes do not change it. */
-export function historyKey(s: Pick<PortfolioSnapshot, 'holdings' | 'hideAmounts' | 'baseCurrency'>): string {
+/**
+ * Identity of everything the chart depends on. Quote refreshes do not change it. `group` restricts the chart to
+ * stocks or crypto (the Stocks / Crypto views); omitted = whole portfolio.
+ */
+export function historyKey(
+  s: Pick<PortfolioSnapshot, 'holdings' | 'hideAmounts' | 'baseCurrency'>,
+  range: ChartRange = DEFAULT_CHART_RANGE,
+  group?: PortfolioGroup,
+): string {
   return JSON.stringify([
     s.baseCurrency,
     s.hideAmounts,
+    range,
+    group ?? null,
     s.holdings.map(({ holding: h }) => [h.id, h.symbol, h.market, h.quantity, h.buyPrice, h.buyDate ?? null]),
   ]);
 }
-

@@ -1,11 +1,11 @@
-import { Currency, Holding, ProviderId, Quote } from '../types';
-import { nativeCurrency } from '../symbols';
+import { ChartRange, Currency, DEFAULT_CHART_RANGE, Holding, IntradayPoint, ProviderId, Quote } from '../types';
+import { marketGroup, nativeCurrency, PortfolioGroup } from '../symbols';
 import { errorMessage, mapSettled } from '../util/async';
 import { Disposable, Emitter, Event } from '../util/emitter';
 import { IndexResult, MarketDataService, sourceLabel } from '../market/marketData';
 import { Settings, SettingsSource } from '../settings';
 import { computeHoldingPnL, computeTotals, HoldingPnL, PortfolioTotals } from './calc';
-import { buildHistorySeries, HistoryPoint } from './history';
+import { buildHistorySeries, buildIntradaySeries, HistoryPoint } from './history';
 import { HoldingsStore } from './store';
 
 export interface HoldingRow {
@@ -52,9 +52,10 @@ export interface PortfolioSnapshot {
 }
 
 export interface HistorySeries {
+  range: ChartRange;
   baseCurrency: Currency;
   hideAmounts: boolean;
-  /** Ascending by date. Points hold both value and P/L %, so the UI can switch based on hideAmounts. */
+  /** Ascending by date (by time for the 1D range). Points hold both value and P/L %, so the UI can switch based on hideAmounts. */
   points: HistoryPoint[];
   errors: string[];
 }
@@ -241,11 +242,43 @@ export class PortfolioController implements Disposable {
     return this.running;
   }
 
-  /** 30-day portfolio series (value, invested, P/L, P/L %) in the base currency. */
-  async getHistorySeries(): Promise<HistorySeries> {
-    const holdings = this.deps.store.list();
+  /**
+   * Portfolio series (value, invested, P/L, P/L %) in the base currency for a chart range: daily closes for
+   * 15D / 30D, 15-minute bars over the last 24h for 1D. `group` restricts it to stocks or crypto holdings.
+   */
+  async getHistorySeries(range: ChartRange = DEFAULT_CHART_RANGE, group?: PortfolioGroup): Promise<HistorySeries> {
+    const holdings = this.deps.store.list().filter((h) => !group || marketGroup(h.market) === group);
     const base = this.settings.baseCurrency;
     const errors: string[] = [];
+    const needsFx = holdings.some((h) => nativeCurrency(h.market) !== base);
+    const common = { range, baseCurrency: base, hideAmounts: this.settings.hideAmounts };
+
+    if (range === '1D') {
+      const settled = await mapSettled(holdings, 4, (h) => this.deps.market.getIntraday(h));
+      const items = holdings.map((holding, i) => {
+        const r = settled[i];
+        if (!r.ok) errors.push(`${holdingLabel(holding)}: ${r.error.message}`);
+        return { holding, points: r.ok ? r.value : undefined };
+      });
+      let fxSeries: IntradayPoint[] | undefined;
+      let usdInr = this.data.fx?.rate;
+      if (needsFx) {
+        try {
+          fxSeries = await this.deps.market.getFxIntraday();
+        } catch {
+          // fall back to the spot rate below
+        }
+        if (!fxSeries?.length && usdInr === undefined) {
+          try {
+            usdInr = (await this.deps.market.getFxRate()).rate;
+          } catch (e) {
+            errors.push(`USDINR: ${errorMessage(e)}`);
+          }
+        }
+      }
+      return { ...common, points: buildIntradaySeries(items, { base, usdInr, fxSeries, now: this.now() }), errors };
+    }
+
     const settled = await mapSettled(holdings, 4, (h) => this.deps.market.getHistory(h));
     const items = holdings.map((holding, i) => {
       const r = settled[i];
@@ -253,19 +286,14 @@ export class PortfolioController implements Disposable {
       return { holding, closes: r.ok ? r.value : undefined };
     });
     let usdInr = this.data.fx?.rate;
-    if (holdings.some((h) => nativeCurrency(h.market) !== base) && usdInr === undefined) {
+    if (needsFx && usdInr === undefined) {
       try {
         usdInr = (await this.deps.market.getFxRate()).rate;
       } catch (e) {
         errors.push(`USDINR: ${errorMessage(e)}`);
       }
     }
-    return {
-      baseCurrency: base,
-      hideAmounts: this.settings.hideAmounts,
-      points: buildHistorySeries(items, { base, usdInr }),
-      errors,
-    };
+    return { ...common, points: buildHistorySeries(items, { base, usdInr, days: range === '15D' ? 15 : 30 }), errors };
   }
 
   dispose(): void {

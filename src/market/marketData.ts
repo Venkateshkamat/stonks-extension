@@ -1,11 +1,15 @@
 import { mapSettled, errorMessage } from '../util/async';
-import { FX_SYMBOL, DailyClose, IndexDef, INDICES, ProviderId, Quote, SymbolRef } from '../types';
+import { FX_SYMBOL, DailyClose, IndexDef, INDICES, IntradayPoint, ProviderId, Quote, SymbolRef } from '../types';
 import { normalizeSymbol } from '../symbols';
 import { FetchFn, HttpError } from './http';
 import { FinnhubProvider } from './finnhub';
 import { YahooProvider } from './yahoo';
 
 const SPARSE_HISTORY_DAYS = 5;
+const SPARSE_INTRADAY_POINTS = 10;
+
+/** How long intraday series stay cached (and the minimum gap between 1D chart reloads). */
+export const INTRADAY_TTL_MS = 5 * 60 * 1000;
 
 export interface MarketDataOptions {
   fetch: FetchFn;
@@ -16,6 +20,8 @@ export interface MarketDataOptions {
   quoteTtlMs?: number;
   /** History cache TTL. Default 1 hour. */
   historyTtlMs?: number;
+  /** Intraday (15m bars) cache TTL. Default 5 minutes. */
+  intradayTtlMs?: number;
   /** Max concurrent requests for batch calls. Default 4. */
   concurrency?: number;
 }
@@ -40,6 +46,12 @@ interface CacheEntry<T> {
   promise: Promise<T>;
 }
 
+interface SeriesEntry<T> {
+  at: number;
+  value?: T;
+  promise?: Promise<T>;
+}
+
 export class MarketDataService {
   readonly yahoo: YahooProvider;
   readonly finnhub: FinnhubProvider;
@@ -47,9 +59,11 @@ export class MarketDataService {
   private readonly now: () => number;
   private readonly quoteTtl: number;
   private readonly historyTtl: number;
+  private readonly intradayTtl: number;
   private readonly concurrency: number;
   private quotes = new Map<string, CacheEntry<Quote>>();
-  private history = new Map<string, { at: number; value?: DailyClose[]; promise?: Promise<DailyClose[]> }>();
+  private history = new Map<string, SeriesEntry<DailyClose[]>>();
+  private intraday = new Map<string, SeriesEntry<IntradayPoint[]>>();
   private lastFx?: number;
   private finnhubIssue?: FinnhubIssue;
 
@@ -59,6 +73,7 @@ export class MarketDataService {
     this.now = opts.now ?? Date.now;
     this.quoteTtl = opts.quoteTtlMs ?? 10_000;
     this.historyTtl = opts.historyTtlMs ?? 60 * 60 * 1000;
+    this.intradayTtl = opts.intradayTtlMs ?? INTRADAY_TTL_MS;
     this.concurrency = opts.concurrency ?? 4;
   }
 
@@ -75,6 +90,7 @@ export class MarketDataService {
   clearAll(): void {
     this.quotes.clear();
     this.history.clear();
+    this.intraday.clear();
     this.finnhubIssue = undefined;
   }
 
@@ -123,26 +139,46 @@ export class MarketDataService {
   /** ~1 month of daily closes (Yahoo), cached for an hour; stale cache is served if a refetch fails. */
   getHistory(ref: SymbolRef): Promise<DailyClose[]> {
     const key = `h:${ref.market}:${normalizeSymbol(ref.symbol, ref.market)}`;
-    const entry = this.history.get(key);
-    if (entry && this.now() - entry.at < this.historyTtl) {
+    return this.cachedSeries(this.history, key, this.historyTtl, () => this.fetchHistory(ref));
+  }
+
+  /**
+   * ~5 trading days of 15-minute closes (Yahoo) for the 1D chart, cached for 5 minutes; stale cache is served
+   * if a refetch fails. The extra days before the 24h window let symbols that have not traded yet today seed
+   * their forward-fill.
+   */
+  getIntraday(ref: SymbolRef): Promise<IntradayPoint[]> {
+    const key = `hi:${ref.market}:${normalizeSymbol(ref.symbol, ref.market)}`;
+    return this.cachedSeries(this.intraday, key, this.intradayTtl, () => this.fetchIntraday(ref));
+  }
+
+  /** Intraday USDINR=X series, used to convert holdings at the rate prevailing at each chart point. */
+  getFxIntraday(): Promise<IntradayPoint[]> {
+    return this.cachedSeries(this.intraday, `hi:fx`, this.intradayTtl, () => this.yahoo.getIntradayRaw(FX_SYMBOL));
+  }
+
+  private cachedSeries<T>(cache: Map<string, SeriesEntry<T>>, key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+    const entry = cache.get(key);
+    if (entry && this.now() - entry.at < ttl) {
       if (entry.value) return Promise.resolve(entry.value);
       if (entry.promise) return entry.promise;
     }
     const stale = entry?.value;
-    const promise = this.fetchHistory(ref)
+    const promise = load()
       .then((value) => {
-        this.history.set(key, { at: this.now(), value });
+        cache.set(key, { at: this.now(), value });
         return value;
       })
       .catch((e) => {
         if (stale) {
-          this.history.set(key, { at: this.now() - this.historyTtl + 60_000, value: stale });
+          // serve the stale series and retry in a minute
+          cache.set(key, { at: this.now() - ttl + 60_000, value: stale });
           return stale;
         }
-        this.history.delete(key);
+        cache.delete(key);
         throw e;
       });
-    this.history.set(key, { at: this.now(), promise, value: undefined });
+    cache.set(key, { at: this.now(), promise });
     return promise;
   }
 
@@ -153,6 +189,20 @@ export class MarketDataService {
     if (ref.market === 'BSE' && h.length < SPARSE_HISTORY_DAYS) {
       try {
         const nse = await this.yahoo.getHistory(ref.symbol, 'NSE');
+        if (nse.length > h.length) return nse;
+      } catch {
+        // keep the sparse BSE series
+      }
+    }
+    return h;
+  }
+
+  private async fetchIntraday(ref: SymbolRef): Promise<IntradayPoint[]> {
+    const h = await this.yahoo.getIntraday(ref.symbol, ref.market);
+    // Same BSE (.BO) sparsity workaround as for daily history: fall back to the NSE listing.
+    if (ref.market === 'BSE' && h.length < SPARSE_INTRADAY_POINTS) {
+      try {
+        const nse = await this.yahoo.getIntraday(ref.symbol, 'NSE');
         if (nse.length > h.length) return nse;
       } catch {
         // keep the sparse BSE series

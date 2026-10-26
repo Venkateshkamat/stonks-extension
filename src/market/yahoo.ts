@@ -1,4 +1,4 @@
-import { Currency, DailyClose, Market, Quote } from '../types';
+import { Currency, DailyClose, IntradayPoint, Market, Quote } from '../types';
 import { yahooSymbol } from '../symbols';
 import { FetchFn, getJson, NotFoundError } from './http';
 import { QuoteProvider } from './provider';
@@ -98,6 +98,19 @@ export function parseYahooHistory(json: unknown, rawSymbol: string): DailyClose[
   return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, close]) => ({ date, close }));
 }
 
+/** Intraday bar closes (epoch ms) with null bars skipped, ascending and de-duplicated by time. */
+export function parseYahooIntraday(json: unknown, rawSymbol: string): IntradayPoint[] {
+  const result = extractResult(json, rawSymbol);
+  const ts = result.timestamp ?? [];
+  const closes = result.indicators?.quote?.[0]?.close ?? [];
+  const byTime = new Map<number, number>();
+  for (let i = 0; i < ts.length; i++) {
+    const c = closes[i];
+    if (typeof c === 'number' && Number.isFinite(c) && typeof ts[i] === 'number') byTime.set(ts[i] * 1000, c);
+  }
+  return [...byTime.entries()].sort(([a], [b]) => a - b).map(([t, close]) => ({ t, close }));
+}
+
 export class YahooProvider implements QuoteProvider {
   readonly id = 'yahoo' as const;
 
@@ -123,8 +136,18 @@ export class YahooProvider implements QuoteProvider {
     return parseYahooHistory(json, raw);
   }
 
-  private fetchChart(rawSymbol: string, range: '1d' | '1mo'): Promise<unknown> {
-    const url = `${BASE_URL}${encodeURIComponent(rawSymbol)}?range=${range}&interval=1d`;
+  /** ~5 trading days of 15-minute bars (the last 24h is cut from this; the older bars seed forward-fill). */
+  getIntraday(symbol: string, market: Market): Promise<IntradayPoint[]> {
+    return this.getIntradayRaw(yahooSymbol(symbol, market));
+  }
+
+  async getIntradayRaw(rawSymbol: string): Promise<IntradayPoint[]> {
+    const json = await this.fetchChart(rawSymbol, '5d', '15m');
+    return parseYahooIntraday(json, rawSymbol);
+  }
+
+  private fetchChart(rawSymbol: string, range: '1d' | '1mo' | '5d', interval: '1d' | '15m' = '1d'): Promise<unknown> {
+    const url = `${BASE_URL}${encodeURIComponent(rawSymbol)}?range=${range}&interval=${interval}`;
     return getJson(url, this.fetchFn, { 'User-Agent': YAHOO_USER_AGENT, Accept: 'application/json' });
   }
 }

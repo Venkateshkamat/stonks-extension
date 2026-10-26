@@ -241,6 +241,16 @@ describe('historyKey', () => {
     assert.strictEqual(historyKey(refreshed), historyKey(base));
   });
 
+  it('changes with the chart range and the stocks / crypto group', () => {
+    const k = historyKey(base);
+    assert.strictEqual(historyKey(base, '30D'), k, 'default range is 30D');
+    assert.notStrictEqual(historyKey(base, '1D'), k);
+    assert.notStrictEqual(historyKey(base, '15D'), k);
+    assert.notStrictEqual(historyKey(base, '1D'), historyKey(base, '15D'));
+    assert.notStrictEqual(historyKey(base, '30D', 'crypto'), k);
+    assert.notStrictEqual(historyKey(base, '30D', 'stocks'), historyKey(base, '30D', 'crypto'));
+  });
+
   it('changes when holdings, hideAmounts or base currency change', () => {
     const k = historyKey(base);
     assert.notStrictEqual(historyKey(snapshot([reliance])), k);

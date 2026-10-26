@@ -11,7 +11,8 @@
   1. npm run compile            (copies media/ and Chart.js into dist/media/)
   2. open dev/preview.html      (file:// works)
 
-  Query params: ?variant=shown|hidden|usd|errors|loading|empty  &theme=dark|light
+  Query params: ?variant=shown|hidden|usd|errors|loading|empty  &theme=dark|light  &range=1D|15D|30D
+  The currency toggle and the 1D | 15D | 30D selector in the page are live (the mock answers them).
   Mock data comes from dev/preview-data.js (npm run preview:data regenerates it from the real model builders).
 -->
 <link rel="stylesheet" href="../dist/media/panel.css">
@@ -48,6 +49,7 @@
   var params = new URLSearchParams(location.search);
   var MOCK = window.STONKS_MOCK;
   var current = MOCK[params.get('variant')] ? params.get('variant') : 'shown';
+  var range = ['1D', '15D', '30D'].indexOf(params.get('range')) >= 0 ? params.get('range') : '30D';
 
   var THEMES = {
     dark: {
@@ -119,13 +121,19 @@
 
   function sendState(name, opts) {
     var v = MOCK[name];
-    var model = v.model;
-    if (opts && opts.loading) model = Object.assign({}, model, { loading: true });
+    var model = Object.assign({}, v.model, { chartRange: range });
+    if (opts && opts.loading) model.loading = true;
     deliver({ type: 'state', model: model });
-    if (v.chart === undefined) return;
+    sendChart(name);
+  }
+
+  function sendChart(name) {
+    var chart = MOCK[name].charts[range];
+    if (chart === undefined) return;
     // The real extension posts `chart: null` while history loads, then the chart.
     deliver({ type: 'history', chart: null });
-    setTimeout(function () { if (current === name) deliver({ type: 'history', chart: v.chart }); }, 250);
+    var r = range;
+    setTimeout(function () { if (current === name && range === r) deliver({ type: 'history', chart: chart }); }, 250);
   }
 
   function setVariant(name) {
@@ -141,12 +149,15 @@
         log(JSON.stringify(msg));
         console.log('[webview -> extension]', msg);
         if (msg.type === 'ready') setTimeout(function () { sendState(current); }, 0);
-        else if (msg.type === 'setCurrency') setVariant(msg.currency === 'USD' ? 'usd' : current === 'usd' ? 'shown' : current);
+        else if (msg.type === 'setRange') {
+          range = msg.range;
+          sendState(current);
+        } else if (msg.type === 'setCurrency') setVariant(msg.currency === 'USD' ? 'usd' : current === 'usd' ? 'shown' : current);
         else if (msg.type === 'action' && msg.action === 'toggleHide') setVariant(current === 'hidden' ? 'shown' : 'hidden');
         else if (msg.type === 'action' && msg.action === 'refresh') {
           var name = current;
-          deliver({ type: 'state', model: Object.assign({}, MOCK[name].model, { loading: true }) });
-          setTimeout(function () { if (current === name) deliver({ type: 'state', model: MOCK[name].model }); }, 800);
+          deliver({ type: 'state', model: Object.assign({}, MOCK[name].model, { chartRange: range, loading: true }) });
+          setTimeout(function () { if (current === name) deliver({ type: 'state', model: Object.assign({}, MOCK[name].model, { chartRange: range }) }); }, 800);
         }
       },
       getState: function () { return undefined; },

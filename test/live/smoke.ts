@@ -31,6 +31,9 @@ async function main(): Promise<void> {
       const h = await svc.getHistory(ref);
       console.log(`  history: ${h.length} days, ${h[0]?.date} .. ${h[h.length - 1]?.date}, last close=${h[h.length - 1]?.close}`);
       check(h.length >= 15, `${ref.symbol} history length`);
+      const i = await svc.getIntraday(ref);
+      console.log(`  intraday: ${i.length} bars, ${new Date(i[0]?.t).toISOString()} .. ${new Date(i[i.length - 1]?.t).toISOString()}`);
+      check(i.length >= 20, `${ref.symbol} intraday length`);
     } catch (e) {
       failures++;
       console.error(`${ref.market}:${ref.symbol} ERROR`, e instanceof Error ? e.message : e);
@@ -40,6 +43,9 @@ async function main(): Promise<void> {
     const fx = await svc.getFxRate();
     console.log(`USDINR rate=${fx.rate} stale=${fx.stale}`);
     check(fx.rate > 50 && fx.rate < 200, 'fx sane');
+    const fi = await svc.getFxIntraday();
+    console.log(`USDINR intraday: ${fi.length} points (nulls skipped)`);
+    check(fi.length >= 20, 'fx intraday length');
   } catch (e) {
     failures++;
     console.error('FX ERROR', e);

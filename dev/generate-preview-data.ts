@@ -9,9 +9,9 @@ import * as path from 'path';
 import { buildChartModel } from '../src/panel/chartModel';
 import { buildPanelModel, historyKey, PanelModel } from '../src/panel/model';
 import { buildSnapshot, FetchedData, HistorySeries } from '../src/portfolio/controller';
-import { buildHistorySeries } from '../src/portfolio/history';
+import { buildHistorySeries, buildIntradaySeries } from '../src/portfolio/history';
 import { DEFAULT_SETTINGS, Settings } from '../src/settings';
-import { DailyClose, Holding, INDICES, Quote } from '../src/types';
+import { ChartRange, CHART_RANGES, DailyClose, Holding, INDICES, IntradayPoint, Quote } from '../src/types';
 
 const NOW = Date.UTC(2026, 9, 23, 10, 32, 11);
 const TODAY = '2026-10-23';
@@ -103,19 +103,68 @@ function closesFor(h: Holding, seed: number): DailyClose[] {
   return out;
 }
 
-function history(holdings: Holding[], settings: Settings, errors: string[] = []): HistorySeries {
+/** 15-minute bars for the last ~5 days ending at NOW: stocks only inside a rough session window, crypto around the clock. */
+function intradayFor(h: Holding, seed: number): IntradayPoint[] {
+  const [last] = PRICES[h.symbol];
+  const rand = rng(seed);
+  const STEP = 15 * 60 * 1000;
+  const end = Math.floor(NOW / STEP) * STEP;
+  const out: IntradayPoint[] = [];
+  let price = last;
+  for (let t = end; t > end - 5 * 24 * 60 * 60 * 1000; t -= STEP) {
+    const d = new Date(t);
+    const dow = d.getUTCDay();
+    const minutes = d.getUTCHours() * 60 + d.getUTCMinutes();
+    // NSE/BSE ~03:45-10:00 UTC, US ~13:30-20:00 UTC, weekdays only.
+    const inSession =
+      h.market === 'CRYPTO' ||
+      (dow >= 1 && dow <= 5 && (h.market === 'US' ? minutes >= 13 * 60 + 30 && minutes <= 20 * 60 : minutes >= 3 * 60 + 45 && minutes <= 10 * 60));
+    if (inSession) out.unshift({ t, close: price });
+    price = price / (1 + (rand() - 0.49) * 0.004);
+  }
+  return out;
+}
+
+function fxIntraday(): IntradayPoint[] {
+  const rand = rng(99);
+  const STEP = 15 * 60 * 1000;
+  const end = Math.floor(NOW / STEP) * STEP;
+  const out: IntradayPoint[] = [];
+  let rate = 84.2;
+  for (let t = end; t > end - 5 * 24 * 60 * 60 * 1000; t -= STEP) {
+    out.unshift({ t, close: rate });
+    rate = rate / (1 + (rand() - 0.5) * 0.0006);
+  }
+  return out;
+}
+
+function history(holdings: Holding[], settings: Settings, range: ChartRange, errors: string[] = []): HistorySeries {
+  if (range === '1D') {
+    const items = holdings.map((holding, i) => ({ holding, points: intradayFor(holding, 21 + i * 17) }));
+    return {
+      range,
+      baseCurrency: settings.baseCurrency,
+      hideAmounts: settings.hideAmounts,
+      points: buildIntradaySeries(items, { base: settings.baseCurrency, usdInr: 84.2, fxSeries: fxIntraday(), now: NOW, dateOf: (ms) => new Date(ms).toISOString().slice(0, 10) }),
+      errors,
+    };
+  }
   const items = holdings.map((holding, i) => ({ holding, closes: closesFor(holding, 7 + i * 13) }));
   return {
+    range,
     baseCurrency: settings.baseCurrency,
     hideAmounts: settings.hideAmounts,
-    points: buildHistorySeries(items, { base: settings.baseCurrency, usdInr: 84.2, today: TODAY }),
+    points: buildHistorySeries(items, { base: settings.baseCurrency, usdInr: 84.2, today: TODAY, days: range === '15D' ? 15 : 30 }),
     errors,
   };
 }
 
+type ChartByRange = Partial<Record<ChartRange, ReturnType<typeof buildChartModel> | null>>;
+
 interface Variant {
   model: PanelModel;
-  /** null = still loading; undefined = no chart (empty state). */
+  /** Per range: null = still loading; undefined/absent = no chart (empty state). `chart` is the 30D one. */
+  charts: ChartByRange;
   chart: ReturnType<typeof buildChartModel> | null | undefined;
 }
 
@@ -123,9 +172,11 @@ function variant(holdings: Holding[], settings: Partial<Settings>, opts: { data?
   const st: Settings = { ...DEFAULT_SETTINGS, ...settings };
   const snap = buildSnapshot(holdings, fetched(holdings, opts.data), st, opts.loading ?? false);
   const model = buildPanelModel(snap, { formatTime: () => '10:32:11 AM' });
-  if (holdings.length === 0) return { model, chart: undefined };
-  if (opts.loading) return { model, chart: null };
-  return { model, chart: buildChartModel(history(holdings, st, opts.errors), historyKey(snap)) };
+  if (holdings.length === 0) return { model, charts: {}, chart: undefined };
+  if (opts.loading) return { model, charts: { '1D': null, '15D': null, '30D': null }, chart: null };
+  const charts: ChartByRange = {};
+  for (const r of CHART_RANGES) charts[r] = buildChartModel(history(holdings, st, r, opts.errors), historyKey(snap, r), { timeZone: 'Asia/Kolkata' });
+  return { model, charts, chart: charts['30D'] };
 }
 
 const errorData = (): Partial<FetchedData> => {

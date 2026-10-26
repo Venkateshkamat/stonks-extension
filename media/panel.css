@@ -282,6 +282,18 @@ td.actions .icon-btn:focus-visible {
 }
 
 /* ---- chart ---- */
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-head h2 {
+  min-width: 0;
+}
+.range-toggle {
+  margin-bottom: 8px;
+}
 .chart-box {
   position: relative;
   height: 280px;

@@ -36,6 +36,22 @@ export interface DailyClose {
   close: number;
 }
 
+/** One intraday bar close. */
+export interface IntradayPoint {
+  /** Bar start time, epoch milliseconds. */
+  t: number;
+  close: number;
+}
+
+/** Chart ranges offered by the panel. */
+export type ChartRange = '1D' | '15D' | '30D';
+export const CHART_RANGES: readonly ChartRange[] = ['1D', '15D', '30D'];
+export const DEFAULT_CHART_RANGE: ChartRange = '30D';
+
+export function isChartRange(v: unknown): v is ChartRange {
+  return typeof v === 'string' && (CHART_RANGES as readonly string[]).includes(v);
+}
+
 export interface SymbolRef {
   symbol: string;
   market: Market;
