@@ -4,6 +4,7 @@ import { PortfolioController } from './portfolio/controller';
 import { HOLDINGS_KEY, HoldingsStore } from './portfolio/store';
 import { FinnhubKeyManager } from './ui/apiKey';
 import { registerCommands } from './ui/commands';
+import { StatusBarController } from './ui/statusBar';
 import { VsCodeSettings } from './ui/vscodeSettings';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -20,10 +21,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const store = new HoldingsStore(context.globalState);
   const controller = new PortfolioController({ store, market, settings: new VsCodeSettings() });
+  const statusBar = new StatusBarController(controller);
 
   context.subscriptions.push(
     keys,
     controller,
+    statusBar,
     keys.onDidChange(() => {
       market.clearAll();
       void controller.refresh('key');
