@@ -11,6 +11,9 @@
   1. npm run compile            (copies media/ and Chart.js into dist/media/)
   2. open dev/preview.html      (file:// works)
 
+  The strip at the bottom mocks the status bar: the main item (stocks | crypto) and the pinned tickers; the pin
+  buttons in the panel add / remove them.
+
   Query params: ?variant=shown|hidden|usd|errors|loading|empty  &theme=dark|light  &range=1D|15D|30D
   The currency toggle and the 1D | 15D | 30D selector in the page are live (the mock answers them).
   Mock data comes from dev/preview-data.js (npm run preview:data regenerates it from the real model builders).
@@ -23,12 +26,21 @@
     background: rgba(30, 30, 30, 0.92); color: #ddd; border: 1px solid #555;
   }
   #devbar select, #devbar button { font: inherit; }
+  #statusbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; height: 24px; display: flex; align-items: center; justify-content: flex-start; overflow: hidden;
+    padding: 0 8px; font: 12px system-ui, sans-serif; background: #007acc; color: #fff; gap: 14px;
+  }
+  #statusbar span.sb { cursor: default; white-space: nowrap; }
+  #statusbar .gain { color: #b5f5b0; } #statusbar .loss { color: #ffb4b4; } #statusbar .warning { color: #ffe08a; }
+  #devbar { bottom: 36px !important; }
+  body { padding-bottom: 80px !important; }
   #devlog { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9cdcfe; }
 </style>
 </head>
 <body class="vscode-dark">
 <div id="app"></div>
 
+<div id="statusbar" title="Mock of the VS Code status bar (right side): main Stonks item, then the pinned tickers"></div>
 <div id="devbar">
   <label>Variant
     <select id="variant">
@@ -117,13 +129,50 @@
 
   function log(text) { document.getElementById('devlog').textContent = text; }
 
+  // Pinned keys start from the variant's mock and are then toggled by the panel's pin buttons.
+  var pinnedKeys = null;
+  function pins() {
+    if (pinnedKeys === null) pinnedKeys = MOCK[current].statusBar.pinned.slice();
+    return pinnedKeys;
+  }
+  function withPins(model) {
+    var p = pins();
+    return Object.assign({}, model, {
+      rows: model.rows.map(function (r) { return Object.assign({}, r, { pinned: p.indexOf(r.pinKey) >= 0 }); }),
+      indices: model.indices.map(function (g) {
+        return Object.assign({}, g, { items: g.items.map(function (it) { return Object.assign({}, it, { pinned: p.indexOf(it.pinKey) >= 0 }); }) });
+      })
+    });
+  }
+  function renderStatusBar() {
+    var sb = MOCK[current].statusBar;
+    var bar = document.getElementById('statusbar');
+    bar.textContent = '';
+    function item(m) {
+      var s = document.createElement('span');
+      s.className = 'sb ' + m.tone;
+      s.textContent = m.text.replace(/\$\([a-z~-]+\)\s*/g, '');
+      s.title = m.tooltip;
+      bar.appendChild(s);
+    }
+    item(sb.main); // right-aligned items: higher priority is further left, so the main item comes first and the pins follow it
+    pins().forEach(function (k) {
+      var m = sb.pinItems[k];
+      if (m) item(m);
+    });
+  }
+
   function deliver(data) { window.dispatchEvent(new MessageEvent('message', { data: data })); }
 
-  function sendState(name, opts) {
-    var v = MOCK[name];
-    var model = Object.assign({}, v.model, { chartRange: range });
+  function sendModel(name, opts) {
+    var model = withPins(Object.assign({}, MOCK[name].model, { chartRange: range }));
     if (opts && opts.loading) model.loading = true;
+    renderStatusBar();
     deliver({ type: 'state', model: model });
+  }
+
+  function sendState(name, opts) {
+    sendModel(name, opts);
     sendChart(name);
   }
 
@@ -149,15 +198,20 @@
         log(JSON.stringify(msg));
         console.log('[webview -> extension]', msg);
         if (msg.type === 'ready') setTimeout(function () { sendState(current); }, 0);
-        else if (msg.type === 'setRange') {
+        else if (msg.type === 'togglePin') {
+          var i = pins().indexOf(msg.key);
+          if (i >= 0) pinnedKeys.splice(i, 1);
+          else pinnedKeys.push(msg.key);
+          sendModel(current);
+        } else if (msg.type === 'setRange') {
           range = msg.range;
           sendState(current);
         } else if (msg.type === 'setCurrency') setVariant(msg.currency === 'USD' ? 'usd' : current === 'usd' ? 'shown' : current);
         else if (msg.type === 'action' && msg.action === 'toggleHide') setVariant(current === 'hidden' ? 'shown' : 'hidden');
         else if (msg.type === 'action' && msg.action === 'refresh') {
           var name = current;
-          deliver({ type: 'state', model: Object.assign({}, MOCK[name].model, { chartRange: range, loading: true }) });
-          setTimeout(function () { if (current === name) deliver({ type: 'state', model: Object.assign({}, MOCK[name].model, { chartRange: range }) }); }, 800);
+          deliver({ type: 'state', model: withPins(Object.assign({}, MOCK[name].model, { chartRange: range, loading: true })) });
+          setTimeout(function () { if (current === name) deliver({ type: 'state', model: withPins(Object.assign({}, MOCK[name].model, { chartRange: range })) }); }, 800);
         }
       },
       getState: function () { return undefined; },

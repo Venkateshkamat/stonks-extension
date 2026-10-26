@@ -3,9 +3,10 @@ import { currencySymbol, formatMoney } from '../format';
 import { NotFoundError } from '../market/http';
 import { MarketDataService } from '../market/marketData';
 import { PortfolioController } from '../portfolio/controller';
+import { holdingPin, parsePinKey, Pin, pinKey, PinStore } from '../portfolio/pins';
 import { HoldingsStore } from '../portfolio/store';
 import { nativeCurrency, normalizeSymbol, validateSymbol } from '../symbols';
-import { Currency, Holding, Market, Quote } from '../types';
+import { Currency, findMarketDef, Holding, INDICES, Market, Quote } from '../types';
 import { errorMessage } from '../util/async';
 import { parseBuyDate, parseQuantity, validateBuyDate, validateBuyPrice, validateQuantity, parsePositiveNumber, parseRefreshInterval, validateRefreshInterval } from '../validation';
 import { FinnhubKeyManager } from './apiKey';
@@ -14,6 +15,7 @@ export interface CommandDeps {
   store: HoldingsStore;
   market: MarketDataService;
   controller: PortfolioController;
+  pins: PinStore;
   keys: FinnhubKeyManager;
   /** Opens (or reveals) the portfolio panel. */
   openPortfolio: () => void;
@@ -43,6 +45,8 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     reg('stonks.toggleHideAmounts', () => deps.controller.toggleHideAmounts()),
     reg('stonks.setBaseCurrency', (value?: unknown) => setBaseCurrency(deps, value)),
     reg('stonks.setRefreshInterval', (value?: unknown) => setRefreshInterval(deps, value)),
+    reg('stonks.pinTicker', (key?: unknown) => pinTicker(deps, key)),
+    reg('stonks.unpinTicker', (key?: unknown) => unpinTicker(deps, key)),
     reg('stonks.refresh', () => deps.controller.refresh('manual')),
     reg('stonks.setFinnhubApiKey', () => deps.keys.setKey()),
     reg('stonks.clearFinnhubApiKey', () => deps.keys.clearKey()),
@@ -93,6 +97,87 @@ export async function setRefreshInterval(deps: CommandDeps, value?: unknown): Pr
   }
   if (seconds === deps.controller.currentRefreshIntervalSeconds) return;
   await deps.controller.setRefreshIntervalSeconds(seconds);
+}
+
+type PinPick = vscode.QuickPickItem & { pin?: Pin };
+
+/** Display name for a pin (holding "NSE:RELIANCE" / market row "NIFTY 50"). */
+function pinTitle(p: Pin): string {
+  return p.kind === 'holding' ? `${p.market}:${p.symbol}` : (findMarketDef(p.symbol)?.name ?? p.symbol);
+}
+
+/** Every pinnable ticker: one entry per distinct holding symbol, then the market rows (indices). */
+function pinCandidates(deps: CommandDeps): Pin[] {
+  const seen = new Set<string>();
+  const out: Pin[] = [];
+  for (const h of deps.store.list()) {
+    const p = holdingPin(h.market, h.symbol);
+    if (!seen.has(pinKey(p))) {
+      seen.add(pinKey(p));
+      out.push(p);
+    }
+  }
+  for (const i of INDICES) out.push({ kind: 'market', symbol: i.symbol });
+  return out;
+}
+
+function pinItems(pins: readonly Pin[]): PinPick[] {
+  const items: PinPick[] = [];
+  const holdings = pins.filter((p) => p.kind === 'holding');
+  const markets = pins.filter((p) => p.kind === 'market');
+  if (holdings.length > 0) {
+    items.push({ label: 'Holdings', kind: vscode.QuickPickItemKind.Separator });
+    for (const p of holdings) items.push({ label: pinTitle(p), pin: p });
+  }
+  if (markets.length > 0) {
+    items.push({ label: 'Markets', kind: vscode.QuickPickItemKind.Separator });
+    for (const p of markets) items.push({ label: pinTitle(p), description: findMarketDef(p.symbol)?.region, pin: p });
+  }
+  return items;
+}
+
+/** Whether a pin points at something that exists (a current holding, or a known market row). */
+function isPinTarget(deps: CommandDeps, p: Pin): boolean {
+  return p.kind === 'market' ? findMarketDef(p.symbol) !== undefined : deps.store.list().some((h) => pinKey(holdingPin(h.market, h.symbol)) === pinKey(p));
+}
+
+/**
+ * Pins a holding or market row to the status bar. A pin key (see pinKey()) argument skips the QuickPick; the
+ * panel's pin buttons and the tests use that.
+ */
+export async function pinTicker(deps: CommandDeps, arg?: unknown): Promise<void> {
+  let pin: Pin | undefined;
+  if (arg !== undefined) {
+    pin = parsePinKey(arg);
+    if (!pin || !isPinTarget(deps, pin)) {
+      void vscode.window.showWarningMessage('Stonks: that ticker is not in your holdings or markets list.');
+      return;
+    }
+  } else {
+    const pinned = new Set(deps.pins.list().map(pinKey));
+    const candidates = pinCandidates(deps).filter((p) => !pinned.has(pinKey(p)));
+    if (candidates.length === 0) {
+      void vscode.window.showInformationMessage('Everything is already pinned.');
+      return;
+    }
+    pin = (await vscode.window.showQuickPick(pinItems(candidates), { title: 'Stonks: Pin Ticker to Status Bar', placeHolder: 'Select a holding or market' }))?.pin;
+  }
+  if (pin) await deps.pins.add(pin);
+}
+
+/** Removes a ticker from the status bar. A pin key argument skips the QuickPick. */
+export async function unpinTicker(deps: CommandDeps, arg?: unknown): Promise<void> {
+  let pin: Pin | undefined;
+  if (arg !== undefined) pin = parsePinKey(arg);
+  else {
+    const pinned = deps.pins.list();
+    if (pinned.length === 0) {
+      void vscode.window.showInformationMessage('No tickers are pinned to the status bar.');
+      return;
+    }
+    pin = (await vscode.window.showQuickPick(pinItems(pinned), { title: 'Stonks: Unpin Ticker', placeHolder: 'Select a pinned ticker' }))?.pin;
+  }
+  if (pin) await deps.pins.remove(pin);
 }
 
 /** Fetches a fresh quote to validate a symbol. Returns undefined if the user aborted or rejected it. */

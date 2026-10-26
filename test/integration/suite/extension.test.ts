@@ -29,6 +29,10 @@ function webviewTabs(): vscode.Tab[] {
     .filter((t) => t.input instanceof vscode.TabInputWebview && t.input.viewType.endsWith('stonks.portfolio'));
 }
 
+async function clearPins(): Promise<void> {
+  for (const p of api.pins.list()) await api.pins.remove(p);
+}
+
 async function clearHoldings(): Promise<void> {
   for (const h of api.store.list()) await api.store.remove(h.id);
 }
@@ -60,7 +64,10 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
 
   after(async function () {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-    if (api) await clearHoldings();
+    if (api) {
+      await clearHoldings();
+      await clearPins();
+    }
     // Back to the default (unset) value in whichever scope toggleHideAmounts wrote to.
     await vscode.workspace.getConfiguration('stonks').update('hideAmounts', undefined, vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('stonks').update('hideAmounts', undefined, vscode.ConfigurationTarget.Workspace);
@@ -73,7 +80,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
 
   it('registers every contributed command', async () => {
     const contributed: string[] = ext.packageJSON.contributes.commands.map((c: { command: string }) => c.command);
-    for (const id of ['stonks.setBaseCurrency', 'stonks.setRefreshInterval']) assert.ok(contributed.includes(id), `manifest is missing ${id}`);
+    for (const id of ['stonks.setBaseCurrency', 'stonks.setRefreshInterval', 'stonks.pinTicker', 'stonks.unpinTicker']) assert.ok(contributed.includes(id), `manifest is missing ${id}`);
     assert.ok(contributed.length >= 8, `expected the manifest to contribute commands, got ${contributed.length}`);
     const all = new Set(await vscode.commands.getCommands(true));
     const missing = contributed.filter((c) => !all.has(c));
@@ -166,6 +173,38 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       await waitFor('controller back to 60s', () => api.controller.currentRefreshIntervalSeconds === 60);
     });
 
+    it('pinning a holding and an index creates status bar items right after the main item; unpinning removes them', async function () {
+      this.timeout(NETWORK_TIMEOUT);
+      assert.strictEqual(api.panel.isOpen, false, 'index pins must work with the panel closed');
+      assert.strictEqual(api.statusBar.pins.length, 0);
+      try {
+        await vscode.commands.executeCommand('stonks.pinTicker', 'h:US:AAPL');
+        const aapl = await waitFor('AAPL pin with a quote', () => api.statusBar.pins.find((p) => p.key === 'h:US:AAPL' && /^AAPL \$[\d,]+\.\d{2} [+-]?\d+\.\d{2}%$/.test(p.text)), NETWORK_TIMEOUT);
+        assert.match(aapl.tooltip, /^AAPL \(US\)\n/);
+        assert.match(aapl.tooltip, /Your P\/L: [+-]?\d+\.\d{2}%/, 'holding pins show the aggregated P/L %');
+        assert.strictEqual(aapl.command, 'stonks.openPortfolio');
+        assert.ok(aapl.priority < api.statusBar.priority!, 'the pin is placed to the right of the main item');
+
+        await vscode.commands.executeCommand('stonks.pinTicker', 'm:^NSEI');
+        const nifty = await waitFor('NIFTY 50 pin with a quote (fetched without the panel)', () => api.statusBar.pins.find((p) => p.key === 'm:^NSEI' && /^NIFTY 50 [\d,]+\.\d{2} [+-]?\d+\.\d{2}%$/.test(p.text)), NETWORK_TIMEOUT);
+        assert.ok(!/Your P\/L/.test(nifty.tooltip));
+        const order = api.statusBar.pins;
+        assert.deepStrictEqual(order.map((p) => p.key), ['h:US:AAPL', 'm:^NSEI'], 'pin order');
+        assert.ok(order[0].priority > order[1].priority, 'later pins are further right');
+        assert.deepStrictEqual(api.pins.list().map((p) => (p.kind === 'holding' ? `h:${p.market}:${p.symbol}` : `m:${p.symbol}`)), ['h:US:AAPL', 'm:^NSEI']);
+        assert.strictEqual(api.controller.snapshot.indices.length, 0, 'the markets table is not loaded while the panel is closed');
+
+        await vscode.commands.executeCommand('stonks.unpinTicker', 'h:US:AAPL');
+        await waitFor('AAPL pin removed', () => api.statusBar.pins.length === 1 && api.statusBar.pins[0].key === 'm:^NSEI');
+        await vscode.commands.executeCommand('stonks.pinTicker', 'h:US:NOTMINE'); // unknown holding: warns, pins nothing
+        await sleep(200);
+        assert.strictEqual(api.pins.list().length, 1);
+      } finally {
+        await clearPins();
+      }
+      await waitFor('all pins removed', () => api.statusBar.pins.length === 0);
+    });
+
     it('openPortfolio creates exactly one panel, even when called twice', async () => {
       assert.strictEqual(webviewTabs().length, 0);
       await vscode.commands.executeCommand('stonks.openPortfolio');
@@ -191,6 +230,7 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       assert.strictEqual(d.chartLib, true, 'Chart.js did not load in the webview (typeof Chart === "undefined")');
       assert.strictEqual(d.holdingRows, 3, 'the holdings table should show the 3 seeded holdings');
       assert.strictEqual(d.currencyButtons, 2, 'the INR | USD toggle should be rendered in the header');
+      assert.ok((d.pinButtons ?? 0) >= 3, `every holding row has a pin button, got ${d.pinButtons}`);
       assert.strictEqual(d.rangeButtons, 3, 'the 1D | 15D | 30D selector should be rendered above the chart');
       assert.strictEqual(api.panel.range, '30D', 'default range');
       assert.strictEqual(api.panel.currentChart?.range, '30D');

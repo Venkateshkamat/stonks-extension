@@ -1,4 +1,5 @@
 import { PortfolioController } from './portfolio/controller';
+import { PinStore } from './portfolio/pins';
 import { HoldingsStore } from './portfolio/store';
 import { PortfolioPanel } from './ui/portfolioPanel';
 import { StatusBarController } from './ui/statusBar';
@@ -9,6 +10,7 @@ import { StatusBarController } from './ui/statusBar';
  */
 export interface StonksTestApi {
   store: HoldingsStore;
+  pins: PinStore;
   controller: PortfolioController;
   statusBar: StatusBarController;
   panel: PortfolioPanel;

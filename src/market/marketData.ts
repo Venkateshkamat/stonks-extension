@@ -126,11 +126,16 @@ export class MarketDataService {
     }
   }
 
-  async getIndexQuotes(): Promise<IndexResult[]> {
-    const settled = await mapSettled(INDICES, this.concurrency, (index) =>
+  getIndexQuotes(): Promise<IndexResult[]> {
+    return this.getMarketQuotes(INDICES);
+  }
+
+  /** Quotes for watch-list markets (indices; coins later) by Yahoo symbol, with per-symbol errors. */
+  async getMarketQuotes(defs: readonly IndexDef[]): Promise<IndexResult[]> {
+    const settled = await mapSettled(defs, this.concurrency, (index) =>
       this.cachedQuote(`i:${index.symbol}`, false, () => this.yahoo.getQuoteRaw(index.symbol)),
     );
-    return INDICES.map((index, i) => {
+    return defs.map((index, i) => {
       const r = settled[i];
       return r.ok ? { index, quote: r.value } : { index, error: errorMessage(r.error) };
     });

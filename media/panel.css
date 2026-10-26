@@ -276,6 +276,13 @@ td.actions {
 td.actions .icon-btn {
   opacity: 0.55;
 }
+td.actions .icon-btn.on {
+  opacity: 1;
+  color: var(--accent);
+}
+.icon-btn.pin-btn.on svg.icon {
+  fill: currentColor;
+}
 tr:hover td.actions .icon-btn,
 td.actions .icon-btn:focus-visible {
   opacity: 1;

@@ -19,12 +19,14 @@ describe('package manifest', () => {
       'stonks.clearFinnhubApiKey',
       'stonks.editHolding',
       'stonks.openPortfolio',
+      'stonks.pinTicker',
       'stonks.refresh',
       'stonks.removeHolding',
       'stonks.setBaseCurrency',
       'stonks.setFinnhubApiKey',
       'stonks.setRefreshInterval',
       'stonks.toggleHideAmounts',
+      'stonks.unpinTicker',
     ]);
     for (const c of pkg.contributes.commands) assert.strictEqual(c.category, 'Stonks');
   });

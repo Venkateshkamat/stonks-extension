@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { MarketDataService } from './market/marketData';
 import { PortfolioController } from './portfolio/controller';
+import { PINS_KEY, PinStore } from './portfolio/pins';
 import { HOLDINGS_KEY, HoldingsStore } from './portfolio/store';
 import { FinnhubKeyManager } from './ui/apiKey';
 import { registerCommands } from './ui/commands';
@@ -11,7 +12,7 @@ import { VsCodeSettings } from './ui/vscodeSettings';
 import { StonksTestApi } from './testApi';
 
 export async function activate(context: vscode.ExtensionContext): Promise<StonksTestApi | undefined> {
-  context.globalState.setKeysForSync([HOLDINGS_KEY]);
+  context.globalState.setKeysForSync([HOLDINGS_KEY, PINS_KEY]);
 
   // The key manager needs the market service (to verify keys) and the service needs the key: break the cycle lazily.
   let keys: FinnhubKeyManager | undefined;
@@ -23,7 +24,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
   await keys.init();
 
   const store = new HoldingsStore(context.globalState);
-  const controller = new PortfolioController({ store, market, settings: new VsCodeSettings() });
+  const pins = new PinStore(context.globalState);
+  const controller = new PortfolioController({ store, market, settings: new VsCodeSettings(), pins });
   const statusBar = new StatusBarController(controller);
   const panel = new PortfolioPanel(context.extensionUri, controller, new PanelPrefs(context.globalState));
 
@@ -43,6 +45,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
       store,
       market,
       controller,
+      pins,
       keys,
       openPortfolio: () => panel.show(),
     }),
@@ -52,7 +55,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
   void keys.promptOnActivation();
 
   // Integration-test hook: only exposed when the test launcher sets this env var; undefined for real users.
-  return process.env.STONKS_INTEGRATION_TEST === '1' ? { store, controller, statusBar, panel } : undefined;
+  return process.env.STONKS_INTEGRATION_TEST === '1' ? { store, pins, controller, statusBar, panel } : undefined;
 }
 
 export function deactivate(): void {

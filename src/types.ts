@@ -73,4 +73,9 @@ export const INDICES: readonly IndexDef[] = [
   { symbol: '^IXIC', name: 'Nasdaq Composite', region: 'US' },
 ];
 
+/** Resolves a watch-list market symbol (an index today; crypto coins in the crypto view) to its definition. */
+export function findMarketDef(symbol: string): IndexDef | undefined {
+  return INDICES.find((i) => i.symbol === symbol);
+}
+
 export const FX_SYMBOL = 'USDINR=X';

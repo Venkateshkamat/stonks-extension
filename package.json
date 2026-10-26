@@ -57,6 +57,16 @@
         "category": "Stonks"
       },
       {
+        "command": "stonks.pinTicker",
+        "title": "Pin Ticker to Status Bar",
+        "category": "Stonks"
+      },
+      {
+        "command": "stonks.unpinTicker",
+        "title": "Unpin Ticker from Status Bar",
+        "category": "Stonks"
+      },
+      {
         "command": "stonks.refresh",
         "title": "Refresh",
         "category": "Stonks"

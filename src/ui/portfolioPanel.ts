@@ -30,6 +30,8 @@ export interface PanelDiagnostics {
   holdingRows?: number;
   /** Number of buttons in the base-currency toggle (2 when the header rendered). */
   currencyButtons?: number;
+  /** Number of pin buttons (one per holding row and market row). */
+  pinButtons?: number;
   /** Number of buttons in the 1D | 15D | 30D selector (3 when the chart section rendered). */
   rangeButtons?: number;
   /** Uncaught errors / unhandled rejections reported by the webview. */
@@ -131,6 +133,7 @@ export class PortfolioPanel implements vscode.Disposable {
       this.diag.holdingRows = msg.holdingRows;
       this.diag.currencyButtons = msg.currencyButtons;
       this.diag.rangeButtons = msg.rangeButtons;
+      this.diag.pinButtons = msg.pinButtons;
       return;
     }
     if (msg.type === 'error') {
@@ -145,6 +148,15 @@ export class PortfolioPanel implements vscode.Disposable {
       this.post({ type: 'state', model: buildPanelModel(s, { range: this.prefs.chartRange }) });
       if (this.chart && this.chart.key === historyKey(s, this.prefs.chartRange)) this.post({ type: 'history', chart: this.chart });
       else this.ensureHistory(s, true);
+      return;
+    }
+    if (msg.type === 'togglePin') {
+      const pinned = this.controller.snapshot.pins.some((p) => p.key === msg.key);
+      try {
+        await vscode.commands.executeCommand(pinned ? 'stonks.unpinTicker' : 'stonks.pinTicker', msg.key);
+      } catch (e) {
+        void vscode.window.showErrorMessage(`Stonks: ${errorMessage(e)}`);
+      }
       return;
     }
     if (msg.type === 'setRange') {

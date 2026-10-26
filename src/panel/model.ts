@@ -8,6 +8,7 @@ import {
   formatSignedNumber,
 } from '../format';
 import { HoldingRow, PortfolioSnapshot } from '../portfolio/controller';
+import { holdingPin, pinKey } from '../portfolio/pins';
 import { nativeCurrency, PortfolioGroup } from '../symbols';
 import { ChartRange, DEFAULT_CHART_RANGE } from '../types';
 
@@ -38,12 +39,17 @@ export interface RowModel {
   /** e.g. NSE:RELIANCE (for accessible button labels). */
   label: string;
   cells: Cell[];
+  /** Pin identity (shared by all lots of the symbol) and whether it is pinned to the status bar. */
+  pinKey: string;
+  pinned: boolean;
   /** Inline per-symbol error. */
   error?: string;
 }
 
 export interface IndexItemModel {
   name: string;
+  pinKey: string;
+  pinned: boolean;
   level: Cell;
   change: Cell;
   percent: Cell;
@@ -112,7 +118,7 @@ function buildColumns(hide: boolean): Column[] {
   }));
 }
 
-function buildRow(r: HoldingRow, hide: boolean): RowModel {
+function buildRow(r: HoldingRow, hide: boolean, pinned: ReadonlySet<string>): RowModel {
   const { holding: h, pnl } = r;
   const cur = nativeCurrency(h.market);
   const symbolCell: Cell = { text: h.symbol, title: h.buyDate ? `Bought ${h.buyDate}` : undefined };
@@ -135,7 +141,8 @@ function buildRow(r: HoldingRow, hide: boolean): RowModel {
         pnl ? signed(formatSignedMoney(pnl.pnl, cur), pnl.pnl) : MUTED,
         plPct,
       ];
-  return { id: h.id, label: `${h.market}:${h.symbol}`, cells, error: r.error };
+  const key = pinKey(holdingPin(h.market, h.symbol));
+  return { id: h.id, label: `${h.market}:${h.symbol}`, cells, pinKey: key, pinned: pinned.has(key), error: r.error };
 }
 
 function buildCards(s: PortfolioSnapshot): HeaderCard[] {
@@ -153,7 +160,7 @@ function buildCards(s: PortfolioSnapshot): HeaderCard[] {
     : [{ label: 'Current value', main: { text: formatMoney(t.current, cur) } }, { label: 'Invested', main: { text: formatMoney(t.invested, cur) } }, pl, today];
 }
 
-function buildIndices(s: PortfolioSnapshot): IndexGroupModel[] {
+function buildIndices(s: PortfolioSnapshot, pinned: ReadonlySet<string>): IndexGroupModel[] {
   const groups: IndexGroupModel[] = [];
   for (const region of ['India', 'US'] as const) {
     const locale = region === 'India' ? 'en-IN' : 'en-US';
@@ -161,8 +168,11 @@ function buildIndices(s: PortfolioSnapshot): IndexGroupModel[] {
     for (const r of s.indices) {
       if (r.index.region !== region) continue;
       const q = r.quote;
+      const key = pinKey({ kind: 'market', symbol: r.index.symbol });
       items.push({
         name: r.index.name,
+        pinKey: key,
+        pinned: pinned.has(key),
         level: q ? { text: formatNumber(q.price, locale) } : MUTED,
         change: q ? signed(formatSignedNumber(q.change, locale), q.change) : MUTED,
         percent: q ? percentCell(q.changePercent) : MUTED,
@@ -187,6 +197,7 @@ export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = 
     statusMessage = s.loading || s.lastUpdated === undefined ? 'Loading quotes...' : 'Could not load quotes. See the errors below.';
   }
 
+  const pinned = new Set(s.pins.map((p) => p.key));
   const crossCurrency = s.holdings.some((r) => nativeCurrency(r.holding.market) !== s.baseCurrency);
   const fx =
     s.fxRate !== undefined && crossCurrency
@@ -205,8 +216,8 @@ export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = 
     statusMessage,
     cards: buildCards(s),
     columns: buildColumns(s.hideAmounts),
-    rows: s.holdings.map((r) => buildRow(r, s.hideAmounts)),
-    indices: buildIndices(s),
+    rows: s.holdings.map((r) => buildRow(r, s.hideAmounts, pinned)),
+    indices: buildIndices(s, pinned),
     indicesLoading: s.indices.length === 0,
     warnings,
   };

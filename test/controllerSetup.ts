@@ -1,6 +1,7 @@
 import { fixture, mockFetch } from './helpers';
 import { MarketDataService } from '../src/market/marketData';
 import { PortfolioController } from '../src/portfolio/controller';
+import { PinStore } from '../src/portfolio/pins';
 import { HoldingsStore, KeyValueStore } from '../src/portfolio/store';
 import { DEFAULT_SETTINGS, Settings, SettingsSource } from '../src/settings';
 import { Currency } from '../src/types';
@@ -43,6 +44,7 @@ export function setup(opts: { settings?: Partial<Settings>; routes?: Parameters<
       ['USDINR%3DX?range=5d', { body: fixture('yahoo/USDINR.5d15m.json') }],
       ['/chart/BTC-USD?range=1d', { body: fixture('yahoo/BTC-USD.1d.json') }],
       ['/chart/BTC-USD?range=1mo', { body: fixture('yahoo/BTC-USD.1mo.json') }],
+      ['%5ENSEI', { body: fixture('yahoo/GSPC.1d.json') }],
       ['/chart/RELIANCE.NS?range=1d', { body: fixture('yahoo/RELIANCE.NS.1d.json') }],
       ['/chart/RELIANCE.NS?range=1mo', { body: fixture('yahoo/RELIANCE.NS.1mo.json') }],
       ['/chart/AAPL?range=1d', { body: fixture('yahoo/AAPL.1d.json') }],
@@ -55,6 +57,7 @@ export function setup(opts: { settings?: Partial<Settings>; routes?: Parameters<
   const market = new MarketDataService({ fetch, getFinnhubKey: () => undefined });
   const store = new HoldingsStore(new MemStore());
   const settings = new FakeSettings({ ...DEFAULT_SETTINGS, ...opts.settings });
-  const controller = new PortfolioController({ store, market, settings, now: () => opts.now ?? 1_700_000_000_000 });
-  return { fetch, market, store, settings, controller };
+  const pins = new PinStore(new MemStore());
+  const controller = new PortfolioController({ store, market, settings, pins, now: () => opts.now ?? 1_700_000_000_000 });
+  return { fetch, market, store, settings, controller, pins };
 }

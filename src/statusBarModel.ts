@@ -1,6 +1,7 @@
-import { formatMoney, formatPercent, formatSignedMoney } from './format';
+import { formatMoney, formatNumber, formatPercent, formatPrice, formatSignedMoney, formatSignedNumber } from './format';
 import { GroupSummary, PortfolioSnapshot } from './portfolio/controller';
 import { PortfolioTotals } from './portfolio/calc';
+import { PinItem } from './portfolio/pins';
 import { PortfolioGroup } from './symbols';
 
 export type Tone = 'gain' | 'loss' | 'neutral' | 'warning';
@@ -86,4 +87,24 @@ export function buildStatusBarModel(s: PortfolioSnapshot): StatusBarModel {
   const only = s.groups[0]?.group;
   const label = only === 'crypto' ? 'Crypto ' : '';
   return { text: `$(graph) ${label}${formatPercent(t.pnlPercent)}`, tooltip: lines.join('\n'), tone: percentTone(t.pnlPercent) };
+}
+
+/**
+ * Status bar item for one pinned ticker: `AAPL $231.40 +0.67%` (holdings: last price in the native currency) or
+ * `NIFTY 50 24,832.65 +0.50%` (market rows). Coloured by the day change. Prices and day % are market data, not
+ * portfolio amounts, so they are shown even when amounts are hidden; the tooltip adds the user's P/L % for holdings.
+ */
+export function buildPinStatusModel(p: PinItem): StatusBarModel {
+  const fmtPrice = (v: number) => (p.currency ? formatPrice(v, p.currency) : formatNumber(v, p.locale));
+  const fmtChange = (v: number) => (p.currency ? formatSignedMoney(v, p.currency) : formatSignedNumber(v, p.locale));
+  if (p.price === undefined || p.changePercent === undefined || p.change === undefined) {
+    const lines = [p.name, p.error ? `Could not load quote: ${p.error}` : 'Loading quote...'];
+    if (p.pnlPercent !== undefined) lines.push(`Your P/L: ${formatPercent(p.pnlPercent)}`);
+    lines.push('Click to open portfolio.');
+    return { text: `${p.label} ${p.error ? '--' : '...'}`, tooltip: lines.join('\n'), tone: p.error ? 'warning' : 'neutral' };
+  }
+  const lines = [p.name, `Price: ${fmtPrice(p.price)}`, `Today: ${fmtChange(p.change)} (${formatPercent(p.changePercent)})`];
+  if (p.pnlPercent !== undefined) lines.push(`Your P/L: ${formatPercent(p.pnlPercent)}`);
+  lines.push('Click to open portfolio.');
+  return { text: `${p.label} ${fmtPrice(p.price)} ${formatPercent(p.changePercent)}`, tooltip: lines.join('\n'), tone: percentTone(p.changePercent) };
 }

@@ -12,8 +12,8 @@ describe('parseWebviewMessage', () => {
   });
 
   it('accepts diag and error reports from the webview, normalising their fields', () => {
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3 });
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0, rangeButtons: 0 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3, pinButtons: 9 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3, pinButtons: 9 });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0, rangeButtons: 0, pinButtons: 0 });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 'boom' }), { type: 'error', message: 'boom' });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 42 }), { type: 'error', message: 'unknown error' });
     const long = parseWebviewMessage({ type: 'error', message: 'x'.repeat(5000) });

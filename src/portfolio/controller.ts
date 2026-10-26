@@ -1,4 +1,4 @@
-import { ChartRange, Currency, DEFAULT_CHART_RANGE, Holding, IntradayPoint, ProviderId, Quote } from '../types';
+import { ChartRange, Currency, DEFAULT_CHART_RANGE, findMarketDef, Holding, IndexDef, IntradayPoint, ProviderId, Quote } from '../types';
 import { marketGroup, nativeCurrency, PORTFOLIO_GROUPS, PortfolioGroup } from '../symbols';
 import { errorMessage, mapSettled } from '../util/async';
 import { Disposable, Emitter, Event } from '../util/emitter';
@@ -6,6 +6,7 @@ import { IndexResult, MarketDataService, sourceLabel } from '../market/marketDat
 import { Settings, SettingsSource } from '../settings';
 import { computeHoldingPnL, computeTotals, HoldingPnL, PortfolioTotals } from './calc';
 import { buildHistorySeries, buildIntradaySeries, HistoryPoint } from './history';
+import { buildPinItems, Pin, PinItem, PinStore } from './pins';
 import { HoldingsStore } from './store';
 
 export interface HoldingRow {
@@ -46,6 +47,8 @@ export interface PortfolioSnapshot {
   groups: GroupSummary[];
   /** Index quotes; empty unless indices were requested via setIncludeIndices(true). */
   indices: IndexResult[];
+  /** Pinned tickers resolved against the latest quotes, in pin order (status bar items). */
+  pins: PinItem[];
   /** USD -> INR; undefined if never fetched / not needed. */
   fxRate?: number;
   fxStale: boolean;
@@ -79,6 +82,8 @@ export interface FetchedData {
   fx?: { rate: number; stale: boolean };
   fxError?: string;
   indices: IndexResult[];
+  /** Quotes for pinned market rows (fetched even when the panel is closed). */
+  pinnedMarkets?: IndexResult[];
   finnhubIssue?: string;
   lastUpdated?: number;
 }
@@ -99,6 +104,7 @@ export function buildSnapshot(
   data: FetchedData,
   settings: Settings,
   loading: boolean,
+  pins: readonly Pin[] = [],
 ): PortfolioSnapshot {
   const rows: HoldingRow[] = holdings.map((holding) => {
     const quote = data.quotes.get(holding.id);
@@ -132,6 +138,7 @@ export function buildSnapshot(
       return [{ group, holdings: inGroup.length, totals: hasQuote ? computeTotals(inGroup, settings.baseCurrency, data.fx?.rate) : undefined }];
     }),
     indices: data.indices,
+    pins: buildPinItems(pins, rows, data.pinnedMarkets ?? []),
     fxRate: data.fx?.rate,
     fxStale: data.fx?.stale ?? false,
     baseCurrency: settings.baseCurrency,
@@ -148,6 +155,8 @@ export interface ControllerDeps {
   store: HoldingsStore;
   market: MarketDataService;
   settings: SettingsSource;
+  /** Pinned tickers; their quotes are fetched on every refresh (index pins even when the panel is closed). */
+  pins?: PinStore;
   now?: () => number;
 }
 
@@ -167,6 +176,7 @@ export class PortfolioController implements Disposable {
   private running?: Promise<void>;
   private rerun?: RefreshReason;
   private includeIndices = false;
+  private pins: Pin[] = [];
   private disposed = false;
   private readonly now: () => number;
   private readonly subscriptions: Disposable[] = [];
@@ -174,8 +184,10 @@ export class PortfolioController implements Disposable {
   constructor(private readonly deps: ControllerDeps) {
     this.now = deps.now ?? Date.now;
     this.settings = deps.settings.get();
-    this.current = buildSnapshot(deps.store.list(), this.data, this.settings, false);
+    this.pins = deps.pins?.list() ?? [];
+    this.current = buildSnapshot(deps.store.list(), this.data, this.settings, false, this.pins);
     this.subscriptions.push(deps.store.onDidChange(() => this.onHoldingsChanged()));
+    if (deps.pins) this.subscriptions.push(deps.pins.onDidChange(() => this.onPinsChanged()));
   }
 
   /** Latest computed snapshot. */
@@ -331,8 +343,27 @@ export class PortfolioController implements Disposable {
     void this.refresh('holdings');
   }
 
+  private onPinsChanged(): void {
+    const before = this.pinnedMarketDefs().map((d) => d.symbol).join(',');
+    this.pins = this.deps.pins?.list() ?? [];
+    const defs = this.pinnedMarketDefs();
+    this.rebuild();
+    // Newly pinned market rows need a quote now rather than at the next cycle.
+    if (defs.length > 0 && defs.map((d) => d.symbol).join(',') !== before) void this.refresh('settings');
+  }
+
+  /** Market rows (indices today) currently pinned, in pin order. */
+  private pinnedMarketDefs(): IndexDef[] {
+    const out: IndexDef[] = [];
+    for (const p of this.pins) {
+      const def = p.kind === 'market' ? findMarketDef(p.symbol) : undefined;
+      if (def) out.push(def);
+    }
+    return out;
+  }
+
   private rebuild(loading = this.running !== undefined): void {
-    this.current = buildSnapshot(this.deps.store.list(), this.data, this.settings, loading);
+    this.current = buildSnapshot(this.deps.store.list(), this.data, this.settings, loading, this.pins);
     if (!this.disposed) this.updated.fire(this.current);
   }
 
@@ -379,6 +410,9 @@ export class PortfolioController implements Disposable {
     let indices = this.data.indices;
     if (this.includeIndices) indices = await market.getIndexQuotes();
 
+    const pinnedDefs = this.pinnedMarketDefs();
+    const pinnedMarkets = pinnedDefs.length > 0 ? await market.getMarketQuotes(pinnedDefs) : [];
+
     const issue = market.getFinnhubIssue();
     this.data = {
       quotes,
@@ -386,6 +420,7 @@ export class PortfolioController implements Disposable {
       fx,
       fxError,
       indices,
+      pinnedMarkets,
       finnhubIssue: issue ? FINNHUB_MESSAGES[issue] : undefined,
       lastUpdated: this.now(),
     };

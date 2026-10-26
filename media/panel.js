@@ -24,6 +24,7 @@
       type: 'diag',
       chartLib: typeof Chart !== 'undefined',
       chartRendered: !!chart,
+      pinButtons: app.querySelectorAll('.pin-btn').length,
       rangeButtons: elRange.querySelectorAll('.seg-btn').length,
       holdingRows: elHoldings.querySelectorAll('tbody tr:not(.error-row)').length,
       currencyButtons: elTop.querySelectorAll('.currency-toggle .seg-btn').length,
@@ -65,6 +66,7 @@
     refresh: ['M13.2 8a5.2 5.2 0 1 1-1.6-3.7', 'M13.5 2.5v3.3h-3.3'],
     plus: ['M8 3v10', 'M3 8h10'],
     edit: ['M2.5 13.5l.7-3.1 7.6-7.6a1.2 1.2 0 0 1 1.7 0l.6.6a1.2 1.2 0 0 1 0 1.7l-7.6 7.6z', 'M9.6 4l2.4 2.4'],
+    pin: ['M9.6 2.4l4 4', 'M10.3 3.1L6.6 6.4l-3 .4 5.6 5.6.4-3 3.3-3.7', 'M5.6 10.4l-3.1 3.1'],
     trash: ['M3 4.5h10', 'M6 4.5V3h4v1.5', 'M4.4 4.5l.6 8.5h6l.6-8.5', 'M7 7v4', 'M9 7v4'],
   };
 
@@ -104,6 +106,14 @@
       );
     });
     return box;
+  }
+
+  /** Pin / unpin toggle for a holding or market row (key = pinKey from the model). */
+  function pinButton(key, pinned, name) {
+    var label = (pinned ? 'Unpin ' : 'Pin ') + name + (pinned ? ' from the status bar' : ' to the status bar');
+    var b = iconButton('pin', label, function () { vscode.postMessage({ type: 'togglePin', key: key }); }, 'pin-btn' + (pinned ? ' on' : ''));
+    b.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+    return b;
   }
 
   function act(action, id) {
@@ -240,6 +250,7 @@
         h(
           'td',
           { class: 'actions' },
+          pinButton(r.pinKey, r.pinned, r.label),
           iconButton('edit', 'Edit ' + r.label, function () { act('edit', r.id); }),
           iconButton('trash', 'Remove ' + r.label, function () { act('remove', r.id); }, 'danger'),
         ),
@@ -273,10 +284,11 @@
               h('td', { class: 'right' }, cell(it.level)),
               h('td', { class: 'right' }, cell(it.change)),
               h('td', { class: 'right' }, cell(it.percent)),
+              h('td', { class: 'actions' }, pinButton(it.pinKey, it.pinned, it.name)),
             ),
           );
           if (it.error) {
-            tbody.appendChild(h('tr', { class: 'error-row' }, h('td', { colspan: '4', text: '⚠ ' + it.name + ': ' + it.error })));
+            tbody.appendChild(h('tr', { class: 'error-row' }, h('td', { colspan: '5', text: '⚠ ' + it.name + ': ' + it.error })));
           }
         });
         groups.appendChild(
@@ -300,6 +312,7 @@
                     h('th', { class: 'right', text: 'Level' }),
                     h('th', { class: 'right', text: 'Change' }),
                     h('th', { class: 'right', text: 'Change %' }),
+                    h('th', { scope: 'col', 'aria-label': 'Pin to status bar' }),
                   ),
                 ),
                 tbody,

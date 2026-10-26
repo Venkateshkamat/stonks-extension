@@ -9,6 +9,8 @@ import * as path from 'path';
 import { buildChartModel } from '../src/panel/chartModel';
 import { buildPanelModel, historyKey, PanelModel } from '../src/panel/model';
 import { buildSnapshot, FetchedData, HistorySeries } from '../src/portfolio/controller';
+import { holdingPin, Pin, pinKey } from '../src/portfolio/pins';
+import { buildPinStatusModel, buildStatusBarModel, StatusBarModel } from '../src/statusBarModel';
 import { buildHistorySeries, buildIntradaySeries } from '../src/portfolio/history';
 import { DEFAULT_SETTINGS, Settings } from '../src/settings';
 import { ChartRange, CHART_RANGES, DailyClose, Holding, INDICES, IntradayPoint, Quote } from '../src/types';
@@ -161,7 +163,17 @@ function history(holdings: Holding[], settings: Settings, range: ChartRange, err
 
 type ChartByRange = Partial<Record<ChartRange, ReturnType<typeof buildChartModel> | null>>;
 
+/** What the (mock) status bar shows: the main item, plus the text of every pinnable ticker keyed by pinKey. */
+interface StatusBarMock {
+  main: StatusBarModel;
+  /** Pins that start out pinned, in order. */
+  pinned: string[];
+  /** Status bar text for every holding / index pin key. */
+  pinItems: Record<string, StatusBarModel>;
+}
+
 interface Variant {
+  statusBar: StatusBarMock;
   model: PanelModel;
   /** Per range: null = still loading; undefined/absent = no chart (empty state). `chart` is the 30D one. */
   charts: ChartByRange;
@@ -170,13 +182,23 @@ interface Variant {
 
 function variant(holdings: Holding[], settings: Partial<Settings>, opts: { data?: Partial<FetchedData>; loading?: boolean; errors?: string[] } = {}): Variant {
   const st: Settings = { ...DEFAULT_SETTINGS, ...settings };
-  const snap = buildSnapshot(holdings, fetched(holdings, opts.data), st, opts.loading ?? false);
+  const data = fetched(holdings, opts.data);
+  data.pinnedMarkets = data.indices;
+  const candidates: Pin[] = [holdingPin('NSE', 'RELIANCE'), holdingPin('CRYPTO', 'BTC'), { kind: 'market', symbol: '^NSEI' }];
+  const initial = candidates.filter(
+    (p) => p.kind === 'market' || holdings.some((h) => pinKey(holdingPin(h.market, h.symbol)) === pinKey(p)),
+  );
+  const snap = buildSnapshot(holdings, data, st, opts.loading ?? false, initial);
   const model = buildPanelModel(snap, { formatTime: () => '10:32:11 AM' });
-  if (holdings.length === 0) return { model, charts: {}, chart: undefined };
-  if (opts.loading) return { model, charts: { '1D': null, '15D': null, '30D': null }, chart: null };
+  const everything: Pin[] = [...holdings.map((h) => holdingPin(h.market, h.symbol)), ...INDICES.map((i): Pin => ({ kind: 'market', symbol: i.symbol }))];
+  const pinItems: Record<string, StatusBarModel> = {};
+  for (const item of buildSnapshot(holdings, data, st, false, everything).pins) pinItems[item.key] = buildPinStatusModel(item);
+  const statusBar: StatusBarMock = { main: buildStatusBarModel(snap), pinned: initial.map(pinKey), pinItems };
+  if (holdings.length === 0) return { statusBar, model, charts: {}, chart: undefined };
+  if (opts.loading) return { statusBar, model, charts: { '1D': null, '15D': null, '30D': null }, chart: null };
   const charts: ChartByRange = {};
   for (const r of CHART_RANGES) charts[r] = buildChartModel(history(holdings, st, r, opts.errors), historyKey(snap, r), { timeZone: 'Asia/Kolkata' });
-  return { model, charts, chart: charts['30D'] };
+  return { statusBar, model, charts, chart: charts['30D'] };
 }
 
 const errorData = (): Partial<FetchedData> => {
