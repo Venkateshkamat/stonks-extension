@@ -6,7 +6,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'p
 
 describe('package manifest', () => {
   it('declares the expected identity and engine', () => {
-    assert.strictEqual(pkg.name, 'stonks');
+    assert.strictEqual(pkg.name, 'stonks-watch');
     assert.strictEqual(pkg.publisher, 'venkateshkamat');
     assert.strictEqual(pkg.engines.vscode, '^1.85.0');
     assert.deepStrictEqual(pkg.activationEvents, ['onStartupFinished']);

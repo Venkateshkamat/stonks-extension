@@ -10,7 +10,7 @@ import { VsCodeSettings } from '../../../src/ui/vscodeSettings';
 import type { PortfolioSnapshot } from '../../../src/portfolio/controller';
 import type { StonksTestApi } from '../../../src/testApi';
 
-const EXTENSION_ID = 'venkateshkamat.stonks';
+const EXTENSION_ID = 'venkateshkamat.stonks-watch';
 const NETWORK_TIMEOUT = 60_000;
 
 let ext: vscode.Extension<StonksTestApi | undefined>;

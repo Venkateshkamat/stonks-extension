@@ -1,8 +1,8 @@
 {
-  "name": "stonks",
-  "displayName": "Stonks",
+  "name": "stonks-watch",
+  "displayName": "Stonks Watch: Stocks & Crypto",
   "description": "Watch your stock and crypto holdings: profit/loss in the status bar and a portfolio panel.",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "publisher": "venkateshkamat",
   "license": "MIT",
   "repository": {
