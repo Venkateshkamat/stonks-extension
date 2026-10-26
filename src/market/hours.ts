@@ -31,13 +31,18 @@ function nthSunday(year: number, month: number, n: number): number {
   return 1 + ((7 - firstDow) % 7) + (n - 1) * 7;
 }
 
+const dstRanges = new Map<number, readonly [start: number, end: number]>();
+
 /** UTC offset of America/New_York at `t`, in ms (-5h standard, -4h daylight saving). */
 export function easternOffsetMs(t: number): number {
   const year = new Date(t).getUTCFullYear();
-  // DST starts at 02:00 EST (07:00 UTC) and ends at 02:00 EDT (06:00 UTC).
-  const start = Date.UTC(year, 2, nthSunday(year, 2, 2), 7);
-  const end = Date.UTC(year, 10, nthSunday(year, 10, 1), 6);
-  return (t >= start && t < end ? -4 : -5) * 3_600_000;
+  let range = dstRanges.get(year);
+  if (!range) {
+    // DST starts at 02:00 EST (07:00 UTC) and ends at 02:00 EDT (06:00 UTC).
+    range = [Date.UTC(year, 2, nthSunday(year, 2, 2), 7), Date.UTC(year, 10, nthSunday(year, 10, 1), 6)];
+    dstRanges.set(year, range);
+  }
+  return (t >= range[0] && t < range[1] ? -4 : -5) * 3_600_000;
 }
 
 const IST_OFFSET_MS = 330 * MS_MIN;

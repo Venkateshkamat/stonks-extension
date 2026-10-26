@@ -16,6 +16,11 @@ export interface QuoteCacheStorage {
   read(): QuoteCacheData;
   /** Best effort: failures are swallowed (the cache is an optimisation, not state). */
   write(data: QuoteCacheData): void;
+  /**
+   * A cheap fingerprint of what is stored: it differs whenever any writer has replaced the contents. When provided,
+   * unchanged contents are not read and parsed again.
+   */
+  stamp?(): string;
 }
 
 /** Entries older than this are dropped on save (they are only useful as a last-known-price fallback). */
@@ -71,6 +76,16 @@ export class FileQuoteCacheStorage implements QuoteCacheStorage {
     }
   }
 
+  /** Inode + mtime + size: every write is a rename of a new file, so the inode alone changes with each save. */
+  stamp(): string {
+    try {
+      const st = fs.statSync(this.file);
+      return `${st.ino}:${st.mtimeMs}:${st.size}`;
+    } catch {
+      return '';
+    }
+  }
+
   write(data: QuoteCacheData): void {
     const tmp = `${this.file}.${process.pid}.tmp`;
     try {
@@ -102,6 +117,10 @@ export class MemoryQuoteCacheStorage implements QuoteCacheStorage {
     this.writes++;
     this.data = JSON.parse(JSON.stringify(data)) as QuoteCacheData;
   }
+
+  stamp(): string {
+    return String(this.writes);
+  }
 }
 
 /**
@@ -110,17 +129,27 @@ export class MemoryQuoteCacheStorage implements QuoteCacheStorage {
  * keep each other's entries.
  */
 export class SharedQuoteCache {
+  private loaded?: { stamp: string; data: QuoteCacheData };
+
   constructor(
     private readonly storage: QuoteCacheStorage,
     private readonly now: () => number = Date.now,
   ) {}
 
+  /**
+   * The stored entries. The same (read-only) object is returned for as long as the stored contents are unchanged,
+   * so callers can tell "nothing new" by identity.
+   */
   load(): QuoteCacheData {
-    return this.storage.read();
+    const stamp = this.storage.stamp?.();
+    if (stamp !== undefined && this.loaded?.stamp === stamp) return this.loaded.data;
+    const data = this.storage.read();
+    this.loaded = stamp === undefined ? undefined : { stamp, data };
+    return data;
   }
 
   save(entries: QuoteCacheData): void {
-    const merged = this.storage.read();
+    const merged = { ...this.load() }; // shallow copy: `load()` results are shared and must not be mutated
     for (const [k, e] of Object.entries(entries)) {
       const cur = merged[k];
       if (!cur || e.at >= cur.at) merged[k] = e;
@@ -128,5 +157,6 @@ export class SharedQuoteCache {
     const cutoff = this.now() - CACHE_MAX_AGE_MS;
     for (const [k, e] of Object.entries(merged)) if (e.at < cutoff) delete merged[k];
     this.storage.write(merged);
+    this.loaded = undefined;
   }
 }

@@ -230,6 +230,8 @@ export class PortfolioController implements Disposable {
 
   private readonly entries = new Map<string, QuoteEntry>();
   private finnhubIssue?: string;
+  /** The shared-cache contents last merged into `entries`. */
+  private adoptedFrom?: QuoteCacheData;
   private lastAttemptAt?: number;
   private settings: Settings;
   private current: PortfolioSnapshot;
@@ -464,8 +466,11 @@ export class PortfolioController implements Disposable {
   private adoptShared(): boolean {
     const cache = this.deps.cache;
     if (!cache) return false;
+    const stored = cache.load();
+    if (stored === this.adoptedFrom) return false; // nothing written since we last looked
+    this.adoptedFrom = stored;
     let changed = false;
-    for (const [key, c] of Object.entries(cache.load())) {
+    for (const [key, c] of Object.entries(stored)) {
       const cur = this.entries.get(key);
       if (cur?.at !== undefined && cur.at >= c.at) continue;
       this.entries.set(key, { quote: c.quote, at: c.at, attemptAt: c.at });

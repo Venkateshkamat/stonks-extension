@@ -80,3 +80,40 @@ describe('FileQuoteCacheStorage (two windows sharing one file)', () => {
     assert.deepStrictEqual(s.read(), {});
   });
 });
+
+describe('SharedQuoteCache change detection', () => {
+  it('does not read the backend again while its contents are unchanged, and notices a write by another window', () => {
+    const backend = new MemoryQuoteCacheStorage();
+    const mine = new SharedQuoteCache(backend, () => 10_000);
+    const theirs = new SharedQuoteCache(backend, () => 10_000);
+    theirs.save({ a: entry('A', 1, 9_000) });
+    const first = mine.load();
+    const reads = backend.reads;
+    assert.strictEqual(mine.load(), first, 'same object when nothing changed');
+    assert.strictEqual(mine.load(), first);
+    assert.strictEqual(backend.reads, reads, 'no extra reads');
+    theirs.save({ b: entry('B', 2, 9_500) });
+    const second = mine.load();
+    assert.notStrictEqual(second, first);
+    assert.deepStrictEqual(Object.keys(second).sort(), ['a', 'b']);
+  });
+
+  it('the file backend fingerprint changes with every write, by any window', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stonks-cache-'));
+    try {
+      const a = new FileQuoteCacheStorage(dir);
+      const b = new FileQuoteCacheStorage(dir);
+      assert.strictEqual(a.stamp(), '', 'no file yet');
+      new SharedQuoteCache(a, () => 5_000).save({ k: entry('A', 1, 4_000) });
+      const s1 = a.stamp();
+      assert.notStrictEqual(s1, '');
+      assert.strictEqual(b.stamp(), s1, 'both windows see the same fingerprint');
+      new SharedQuoteCache(b, () => 5_000).save({ k: entry('A', 2, 4_500) });
+      assert.notStrictEqual(a.stamp(), s1);
+      const cache = new SharedQuoteCache(a, () => 5_000);
+      assert.strictEqual(cache.load().k.quote.price, 2);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
