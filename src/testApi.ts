@@ -14,4 +14,6 @@ export interface StonksTestApi {
   controller: PortfolioController;
   statusBar: StatusBarController;
   panel: PortfolioPanel;
+  /** Directory holding the shared quote cache file (quotes.json). */
+  cacheDir: string;
 }

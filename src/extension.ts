@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { MarketDataService } from './market/marketData';
+import { FileQuoteCacheStorage, SharedQuoteCache } from './market/quoteCache';
 import { PortfolioController } from './portfolio/controller';
 import { PINS_KEY, PinStore } from './portfolio/pins';
 import { HOLDINGS_KEY, HoldingsStore } from './portfolio/store';
@@ -22,12 +23,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
     getFinnhubKey: () => keys?.get(),
   });
   keys = new FinnhubKeyManager(context.secrets, context.globalState, market);
-  await keys.init();
+  // SecretStorage is an IPC round trip: read the key in the background so the status bar can render first.
+  const keysReady = keys.init().catch(() => undefined);
 
   const store = new HoldingsStore(context.globalState);
   const pins = new PinStore(context.globalState);
   const focus = new WindowFocus();
-  const controller = new PortfolioController({ store, market, settings: new VsCodeSettings(), pins, focus });
+  // Quotes are shared with the other windows and survive restarts, so the status bar shows the last known numbers at once.
+  const cache = new SharedQuoteCache(new FileQuoteCacheStorage(context.globalStorageUri.fsPath));
+  const controller = new PortfolioController({ store, market, settings: new VsCodeSettings(), pins, focus, cache });
   const statusBar = new StatusBarController(controller);
   const panel = new PortfolioPanel(context.extensionUri, controller, new PanelPrefs(context.globalState));
 
@@ -54,11 +58,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Stonks
     }),
   );
 
-  void controller.start();
-  void keys.promptOnActivation();
+  void keysReady.then(() => {
+    void controller.start();
+    void keys?.promptOnActivation();
+  });
 
   // Integration-test hook: only exposed when the test launcher sets this env var; undefined for real users.
-  return process.env.STONKS_INTEGRATION_TEST === '1' ? { store, pins, controller, statusBar, panel } : undefined;
+  return process.env.STONKS_INTEGRATION_TEST === '1' ? { store, pins, controller, statusBar, panel, cacheDir: context.globalStorageUri.fsPath } : undefined;
 }
 
 export function deactivate(): void {

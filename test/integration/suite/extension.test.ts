@@ -1,5 +1,12 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
+import { MarketDataService } from '../../../src/market/marketData';
+import { FileQuoteCacheStorage, SharedQuoteCache } from '../../../src/market/quoteCache';
+import { PortfolioController } from '../../../src/portfolio/controller';
+import { buildStatusBarModel } from '../../../src/statusBarModel';
+import { VsCodeSettings } from '../../../src/ui/vscodeSettings';
 import type { PortfolioSnapshot } from '../../../src/portfolio/controller';
 import type { StonksTestApi } from '../../../src/testApi';
 
@@ -113,12 +120,16 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
     it('fetches quotes for AAPL, RELIANCE (NSE) and BTC from Yahoo and updates the status bar', async function () {
       this.timeout(NETWORK_TIMEOUT + 10_000);
       let snap: PortfolioSnapshot | undefined;
+      // The shared quote cache may hold quotes from an earlier run, and closed markets are not re-fetched on their own:
+      // force a live fetch so this test really exercises the network.
+      const startedAt = Date.now();
+      await api.controller.refresh('manual');
       try {
         snap = await waitFor(
           'a completed refresh for all three holdings',
           () => {
             const s = api.controller.snapshot;
-            return !s.loading && s.lastUpdated !== undefined && s.holdings.length === 3 && s.holdings.every((r) => r.quote || r.error) ? s : undefined;
+            return !s.loading && (s.lastUpdated ?? 0) >= startedAt && s.holdings.length === 3 && s.holdings.every((r) => r.quote || r.error) ? s : undefined;
           },
           NETWORK_TIMEOUT,
         );
@@ -140,6 +151,28 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       assert.match(api.statusBar.tooltip, /Overall:/);
       assert.match(api.statusBar.tooltip, /Yahoo Finance/);
       assert.match(api.statusBar.tooltip, /Value:/);
+    });
+
+    it('stores fetched quotes in the shared cache, and a new window renders the status bar from it before any network request', () => {
+      const file = path.join(api.cacheDir, 'quotes.json');
+      assert.ok(fs.existsSync(file), `no shared quote cache at ${file}`);
+      const entries = JSON.parse(fs.readFileSync(file, 'utf8')).entries as Record<string, { at: number }>;
+      for (const key of ['q:US:AAPL', 'q:NSE:RELIANCE', 'q:CRYPTO:BTC', 'fx']) assert.ok(entries[key], `cache has no ${key} (has: ${Object.keys(entries).join(', ')})`);
+
+      // What a second editor window (or this one after a restart) does on activation: build a controller over the cache.
+      const offline = new MarketDataService({
+        fetch: () => Promise.reject(new Error('the network must not be used for the first render')),
+        getFinnhubKey: () => undefined,
+      });
+      const fresh = new PortfolioController({ store: api.store, market: offline, settings: new VsCodeSettings(), cache: new SharedQuoteCache(new FileQuoteCacheStorage(api.cacheDir)) });
+      try {
+        const model = buildStatusBarModel(fresh.snapshot);
+        assert.strictEqual(model.text, api.statusBar.text, 'cached first render equals the live status bar');
+        assert.match(model.text, /^\$\(graph\) Stocks [+-]?\d+\.\d{2}% \| Crypto [+-]?\d+\.\d{2}%$/);
+        assert.ok(fresh.snapshot.lastUpdated !== undefined && !fresh.snapshot.loading);
+      } finally {
+        fresh.dispose();
+      }
     });
 
     it('toggleHideAmounts flips the setting and hides amounts in the status bar tooltip', async () => {

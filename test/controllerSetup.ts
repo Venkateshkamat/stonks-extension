@@ -2,9 +2,9 @@ import { fixture, mockFetch } from './helpers';
 import { MarketDataService } from '../src/market/marketData';
 import { ControllerDeps, PortfolioController } from '../src/portfolio/controller';
 import { PinStore } from '../src/portfolio/pins';
-import { HoldingsStore, KeyValueStore } from '../src/portfolio/store';
+import { HOLDINGS_KEY, HoldingsStore, KeyValueStore } from '../src/portfolio/store';
 import { DEFAULT_SETTINGS, Settings, SettingsSource } from '../src/settings';
-import { Currency } from '../src/types';
+import { Currency, Holding } from '../src/types';
 
 export class MemStore implements KeyValueStore {
   data = new Map<string, unknown>();
@@ -35,7 +35,7 @@ export class FakeSettings implements SettingsSource {
 /** Roughly the end of the 5d15m fixtures (2026-10-26 03:23 UTC): BTC's last bar is 03:14 UTC. */
 export const FIXTURE_NOW = 1_792_985_000_000;
 
-export function setup(opts: { settings?: Partial<Settings>; routes?: Parameters<typeof mockFetch>[0]; now?: number; deps?: Partial<ControllerDeps> } = {}) {
+export function setup(opts: { settings?: Partial<Settings>; routes?: Parameters<typeof mockFetch>[0]; now?: number; deps?: Partial<ControllerDeps>; holdings?: Holding[] } = {}) {
   const fetch = mockFetch(
     opts.routes ?? [
       ['/chart/RELIANCE.NS?range=5d', { body: fixture('yahoo/RELIANCE.NS.5d15m.json') }],
@@ -56,7 +56,9 @@ export function setup(opts: { settings?: Partial<Settings>; routes?: Parameters<
   );
   const clockRef: { t: number } = { t: 0 };
   const market = new MarketDataService({ fetch, getFinnhubKey: () => undefined, now: () => clockRef.t });
-  const store = new HoldingsStore(new MemStore());
+  const holdingState = new MemStore();
+  if (opts.holdings) holdingState.data.set(HOLDINGS_KEY, opts.holdings);
+  const store = new HoldingsStore(holdingState);
   const settings = new FakeSettings({ ...DEFAULT_SETTINGS, ...opts.settings });
   const pins = new PinStore(new MemStore());
   const clock = clockRef;

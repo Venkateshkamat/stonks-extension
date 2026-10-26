@@ -5,6 +5,7 @@ import { Disposable, Emitter, Event } from '../util/emitter';
 import { ALWAYS_FOCUSED, FocusSource } from '../util/focus';
 import { IndexResult, MarketDataService, sourceLabel } from '../market/marketData';
 import { MarketClock, MS_MIN, sessionAt } from '../market/hours';
+import { QuoteCacheData, SharedQuoteCache } from '../market/quoteCache';
 import { clockForIndex, clockForMarket, MAX_SLEEP_MS, nextDueAt, refreshIntervalMs } from '../market/schedule';
 import { Settings, SettingsSource } from '../settings';
 import { computeHoldingPnL, computeTotals, HoldingPnL, PortfolioTotals } from './calc';
@@ -166,6 +167,11 @@ export interface ControllerDeps {
   /** Pinned tickers; their quotes are fetched like the holdings' (index pins even when the panel is closed). */
   pins?: PinStore;
   now?: () => number;
+  /**
+   * Quote cache shared with the other editor windows (and kept across restarts): quotes another window fetched
+   * recently are used instead of fetching again, and the controller's own fetches are written back.
+   */
+  cache?: SharedQuoteCache;
   /** Whether the editor window is focused; refreshes are five times less frequent while it is not. Default: always focused. */
   focus?: FocusSource;
   /** Random source for wake-up jitter (so several windows do not all fetch at the same instant). Default Math.random. */
@@ -196,6 +202,8 @@ const CLOSED_RETRY_MS = 5 * MS_MIN;
 const MIN_SLEEP_MS = 1000;
 /** Upper bound of the random delay added to each wake-up. */
 const MAX_JITTER_MS = 3000;
+/** Upper bound of the random delay before the startup refresh when cached data is already on screen. */
+const START_JITTER_MS = 1500;
 
 function holdingQuoteKey(h: Holding): string {
   return `q:${h.market}:${normalizeSymbol(h.symbol, h.market)}`;
@@ -219,6 +227,7 @@ export class PortfolioController implements Disposable {
   private settings: Settings;
   private current: PortfolioSnapshot;
   private timer?: ReturnType<typeof setTimeout>;
+  private startTimer?: ReturnType<typeof setTimeout>;
   private running?: Promise<void>;
   private rerun?: RefreshReason;
   private includeIndices = false;
@@ -236,6 +245,7 @@ export class PortfolioController implements Disposable {
     this.focus = deps.focus ?? ALWAYS_FOCUSED;
     this.settings = deps.settings.get();
     this.pins = deps.pins?.list() ?? [];
+    this.adoptShared();
     this.current = buildSnapshot(deps.store.list(), this.buildData(), this.settings, false, this.pins);
     this.subscriptions.push(deps.store.onDidChange(() => this.onHoldingsChanged()));
     if (deps.pins) this.subscriptions.push(deps.pins.onDidChange(() => this.onPinsChanged()));
@@ -252,9 +262,18 @@ export class PortfolioController implements Disposable {
     return this.settings.refreshIntervalSeconds;
   }
 
-  /** Starts the refresh loop: fetches whatever is due now, then sleeps until the next quote is due. */
+  /**
+   * Starts the refresh loop: fetches whatever is due now, then sleeps until the next quote is due. When cached
+   * quotes are already showing, the first fetch waits a random moment so that several windows opening together
+   * (e.g. on editor startup) do not all request the same quotes.
+   */
   start(): Promise<void> {
-    return this.refresh('start');
+    const delay = this.current.lastUpdated !== undefined ? Math.round(this.random() * START_JITTER_MS) : 0;
+    if (delay <= 0) return this.refresh('start');
+    return new Promise((resolve) => {
+      this.startTimer = setTimeout(() => void this.refresh('start').then(resolve), delay);
+      (this.startTimer as { unref?: () => void }).unref?.();
+    });
   }
 
   /** Whether refreshes should also fetch index quotes (the panel's Stocks view turns this on while shown). */
@@ -394,6 +413,7 @@ export class PortfolioController implements Disposable {
   dispose(): void {
     this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.startTimer) clearTimeout(this.startTimer);
     this.subscriptions.forEach((s) => s.dispose());
     this.updated.dispose();
   }
@@ -428,6 +448,23 @@ export class PortfolioController implements Disposable {
       if (def) out.push(def);
     }
     return out;
+  }
+
+  /**
+   * Takes over quotes that another window (or an earlier session) fetched more recently than ours. Returns whether
+   * anything changed.
+   */
+  private adoptShared(): boolean {
+    const cache = this.deps.cache;
+    if (!cache) return false;
+    let changed = false;
+    for (const [key, c] of Object.entries(cache.load())) {
+      const cur = this.entries.get(key);
+      if (cur?.at !== undefined && cur.at >= c.at) continue;
+      this.entries.set(key, { quote: c.quote, at: c.at, attemptAt: c.at });
+      changed = true;
+    }
+    return changed;
   }
 
   private fxRate(): number | undefined {
@@ -469,36 +506,33 @@ export class PortfolioController implements Disposable {
 
   private buildData(): FetchedData {
     const holdings = this.deps.store.list();
+    /** Entries behind what is on screen: "last updated" is the newest of them. */
+    const used: QuoteEntry[] = [];
     const quotes = new Map<string, Quote>();
     const quoteErrors = new Map<string, string>();
     for (const h of holdings) {
       const e = this.entries.get(holdingQuoteKey(h));
-      if (e?.quote) quotes.set(h.id, e.quote);
-      if (e?.error) quoteErrors.set(h.id, e.error);
+      if (!e) continue;
+      used.push(e);
+      if (e.quote) quotes.set(h.id, e.quote);
+      if (e.error) quoteErrors.set(h.id, e.error);
     }
     const fxEntry = this.entries.get(FX_KEY);
+    if (fxEntry && holdings.some((h) => nativeCurrency(h.market) !== this.settings.baseCurrency)) used.push(fxEntry);
     const fx = fxEntry?.quote ? { rate: fxEntry.quote.price, stale: fxEntry.error !== undefined } : undefined;
     let fxError: string | undefined;
     if (fxEntry?.error) fxError = fx ? 'Live USDINR rate unavailable; using last known rate.' : `USDINR rate unavailable: ${fxEntry.error}`;
     const result = (index: IndexDef): IndexResult => {
       const e = this.entries.get(marketQuoteKey(index));
+      if (e) used.push(e);
       return e?.quote ? { index, quote: e.quote } : { index, error: e?.error ?? 'No quote yet' };
     };
-    const pinned = this.pinnedMarketDefs();
+    const indices = this.includeIndices ? INDICES.map(result) : [];
+    const coins = this.includeCoins ? COINS.map(result) : [];
+    const pinnedMarkets = this.pinnedMarketDefs().map(result);
     let lastUpdated: number | undefined;
-    for (const e of this.entries.values()) if (e.at !== undefined && (lastUpdated === undefined || e.at > lastUpdated)) lastUpdated = e.at;
-    if (lastUpdated === undefined) lastUpdated = this.lastAttemptAt;
-    return {
-      quotes,
-      quoteErrors,
-      fx,
-      fxError,
-      indices: this.includeIndices ? INDICES.map(result) : [],
-      coins: this.includeCoins ? COINS.map(result) : [],
-      pinnedMarkets: pinned.map(result),
-      finnhubIssue: this.finnhubIssue,
-      lastUpdated,
-    };
+    for (const e of used) if (e.at !== undefined && (lastUpdated === undefined || e.at > lastUpdated)) lastUpdated = e.at;
+    return { quotes, quoteErrors, fx, fxError, indices, coins, pinnedMarkets, finnhubIssue: this.finnhubIssue, lastUpdated: lastUpdated ?? this.lastAttemptAt };
   }
 
   private rebuild(loading = this.running !== undefined): void {
@@ -513,6 +547,7 @@ export class PortfolioController implements Disposable {
     if (this.disposed) return;
     const needs = this.collectNeeds();
     if (needs.length === 0) return; // nothing to keep fresh: no timer at all
+    if (this.adoptShared()) this.rebuild(); // another window fetched in the meantime: show it and wake up later
     const now = this.now();
     let due = Infinity;
     for (const n of needs) due = Math.min(due, this.dueAt(n, now));
@@ -528,22 +563,29 @@ export class PortfolioController implements Disposable {
     this.settings = this.deps.settings.get();
     const force = reason === 'manual' || reason === 'key';
     const now = this.now();
+    const adopted = this.adoptShared();
     const todo = this.collectNeeds().filter((n) => force || this.dueAt(n, now) <= now);
     if (todo.length === 0) {
-      if (this.current.loading) this.rebuild(false);
+      if (adopted || this.current.loading) this.rebuild(false);
       return;
     }
-    if (this.lastAttemptAt === undefined) this.rebuild(true);
+    if (this.current.lastUpdated === undefined) this.rebuild(true);
     market.clearQuoteCache();
     const results = await mapSettled(todo, 4, (n) => n.load());
     const done = this.now();
     this.lastAttemptAt = done;
+    const fetched: QuoteCacheData = {};
     todo.forEach((n, i) => {
       const r = results[i];
       const prev = this.entries.get(n.key);
-      if (r.ok) this.entries.set(n.key, { quote: r.value, at: done, attemptAt: done });
-      else this.entries.set(n.key, { quote: prev?.quote, at: prev?.at, attemptAt: done, error: r.error.message });
+      if (r.ok) {
+        this.entries.set(n.key, { quote: r.value, at: done, attemptAt: done });
+        fetched[n.key] = { quote: r.value, at: done };
+      } else {
+        this.entries.set(n.key, { quote: prev?.quote, at: prev?.at, attemptAt: done, error: r.error.message });
+      }
     });
+    if (Object.keys(fetched).length > 0) this.deps.cache?.save(fetched);
     const issue = market.getFinnhubIssue();
     this.finnhubIssue = issue ? FINNHUB_MESSAGES[issue] : undefined;
     this.rebuild(false);
