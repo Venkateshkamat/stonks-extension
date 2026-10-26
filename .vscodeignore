@@ -13,3 +13,4 @@ esbuild.js
 CLAUDE.md
 dev/**
 media/**
+.claude/**
