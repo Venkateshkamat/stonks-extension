@@ -1,8 +1,10 @@
-import { ChartRange, Currency, DEFAULT_CHART_RANGE, findMarketDef, Holding, IndexDef, IntradayPoint, ProviderId, Quote } from '../types';
-import { marketGroup, nativeCurrency, PORTFOLIO_GROUPS, PortfolioGroup } from '../symbols';
+import { ChartRange, COINS, Currency, DEFAULT_CHART_RANGE, findMarketDef, Holding, IndexDef, INDICES, IntradayPoint, ProviderId, Quote } from '../types';
+import { marketGroup, nativeCurrency, normalizeSymbol, PORTFOLIO_GROUPS, PortfolioGroup } from '../symbols';
 import { errorMessage, mapSettled } from '../util/async';
 import { Disposable, Emitter, Event } from '../util/emitter';
 import { IndexResult, MarketDataService, sourceLabel } from '../market/marketData';
+import { MarketClock, MS_MIN, sessionAt } from '../market/hours';
+import { clockForIndex, clockForMarket, MAX_SLEEP_MS, nextDueAt, refreshIntervalMs } from '../market/schedule';
 import { Settings, SettingsSource } from '../settings';
 import { computeHoldingPnL, computeTotals, HoldingPnL, PortfolioTotals } from './calc';
 import { buildHistorySeries, buildIntradaySeries, HistoryPoint } from './history';
@@ -160,21 +162,57 @@ export interface ControllerDeps {
   store: HoldingsStore;
   market: MarketDataService;
   settings: SettingsSource;
-  /** Pinned tickers; their quotes are fetched on every refresh (index pins even when the panel is closed). */
+  /** Pinned tickers; their quotes are fetched like the holdings' (index pins even when the panel is closed). */
   pins?: PinStore;
   now?: () => number;
+  /** Random source for wake-up jitter (so several windows do not all fetch at the same instant). Default Math.random. */
+  random?: () => number;
+}
+
+/** One quote the snapshot needs, and how to fetch it. */
+interface Need {
+  key: string;
+  clock: MarketClock;
+  load: () => Promise<Quote>;
+}
+
+/** What the controller knows about one quote: the last good value, when it was fetched, and the last failure. */
+interface QuoteEntry {
+  quote?: Quote;
+  /** When `quote` was fetched (epoch ms). */
+  at?: number;
+  /** When the last fetch was attempted (successful or not). */
+  attemptAt?: number;
+  /** Set while the last attempt failed. */
+  error?: string;
+}
+
+/** How long after a failed fetch of a closed market's quote to try again. */
+const CLOSED_RETRY_MS = 5 * MS_MIN;
+/** Wake-ups are never closer together than this. */
+const MIN_SLEEP_MS = 1000;
+/** Upper bound of the random delay added to each wake-up. */
+const MAX_JITTER_MS = 3000;
+
+function holdingQuoteKey(h: Holding): string {
+  return `q:${h.market}:${normalizeSymbol(h.symbol, h.market)}`;
 }
 
 /**
  * Central portfolio state. Owns the refresh loop, merges holdings + quotes + FX + indices into a
  * PortfolioSnapshot and notifies listeners (status bar, webview) via onDidUpdate. VS Code agnostic.
+ *
+ * Refreshing is per quote: each quote is re-fetched only when it is due (see market/schedule.ts) - not at all while
+ * its market is closed, apart from one fetch after the close. A single timer sleeps until the earliest due time.
  */
 export class PortfolioController implements Disposable {
   private readonly updated = new Emitter<PortfolioSnapshot>();
   /** Fires with a fresh snapshot after every refresh and on holdings / settings changes. */
   readonly onDidUpdate: Event<PortfolioSnapshot> = this.updated.event;
 
-  private data: FetchedData = { quotes: new Map(), quoteErrors: new Map(), indices: [] };
+  private readonly entries = new Map<string, QuoteEntry>();
+  private finnhubIssue?: string;
+  private lastAttemptAt?: number;
   private settings: Settings;
   private current: PortfolioSnapshot;
   private timer?: ReturnType<typeof setTimeout>;
@@ -185,13 +223,15 @@ export class PortfolioController implements Disposable {
   private pins: Pin[] = [];
   private disposed = false;
   private readonly now: () => number;
+  private readonly random: () => number;
   private readonly subscriptions: Disposable[] = [];
 
   constructor(private readonly deps: ControllerDeps) {
     this.now = deps.now ?? Date.now;
+    this.random = deps.random ?? Math.random;
     this.settings = deps.settings.get();
     this.pins = deps.pins?.list() ?? [];
-    this.current = buildSnapshot(deps.store.list(), this.data, this.settings, false, this.pins);
+    this.current = buildSnapshot(deps.store.list(), this.buildData(), this.settings, false, this.pins);
     this.subscriptions.push(deps.store.onDidChange(() => this.onHoldingsChanged()));
     if (deps.pins) this.subscriptions.push(deps.pins.onDidChange(() => this.onPinsChanged()));
   }
@@ -206,7 +246,7 @@ export class PortfolioController implements Disposable {
     return this.settings.refreshIntervalSeconds;
   }
 
-  /** Starts the refresh loop (immediate refresh, then every refreshIntervalSeconds). */
+  /** Starts the refresh loop: fetches whatever is due now, then sleeps until the next quote is due. */
   start(): Promise<void> {
     return this.refresh('start');
   }
@@ -229,7 +269,6 @@ export class PortfolioController implements Disposable {
     const turnedOn = (indices && !this.includeIndices) || (coins && !this.includeCoins);
     this.includeIndices = indices;
     this.includeCoins = coins;
-    this.data = { ...this.data, indices: indices ? this.data.indices : [], coins: coins ? this.data.coins : [] };
     this.rebuild();
     if (turnedOn) void this.refresh('settings');
   }
@@ -242,7 +281,7 @@ export class PortfolioController implements Disposable {
       // Re-base instantly when the conversion rate is already known (or not needed) so the UI reacts at once;
       // otherwise wait for the refresh to bring the rate.
       const base = this.settings.baseCurrency;
-      if (this.data.fx || this.deps.store.list().every((h) => nativeCurrency(h.market) === base)) this.rebuild(true);
+      if (this.entries.get(FX_KEY)?.quote || this.deps.store.list().every((h) => nativeCurrency(h.market) === base)) this.rebuild(true);
       void this.refresh('settings');
     } else {
       this.rebuild();
@@ -266,7 +305,10 @@ export class PortfolioController implements Disposable {
     this.notifySettingsChanged();
   }
 
-  /** Fetches all quotes now. Overlapping calls are coalesced into one follow-up run. */
+  /**
+   * Fetches the quotes that are due now (all of them for a 'manual' or 'key' refresh, whatever the market state).
+   * Overlapping calls are coalesced into one follow-up run.
+   */
   refresh(reason: RefreshReason = 'manual'): Promise<void> {
     if (this.disposed) return Promise.resolve();
     if (this.running) {
@@ -308,7 +350,7 @@ export class PortfolioController implements Disposable {
         return { holding, points: r.ok ? r.value : undefined };
       });
       let fxSeries: IntradayPoint[] | undefined;
-      let usdInr = this.data.fx?.rate;
+      let usdInr = this.fxRate();
       if (needsFx) {
         try {
           fxSeries = await this.deps.market.getFxIntraday();
@@ -332,7 +374,7 @@ export class PortfolioController implements Disposable {
       if (!r.ok) errors.push(`${holdingLabel(holding)}: ${r.error.message}`);
       return { holding, closes: r.ok ? r.value : undefined };
     });
-    let usdInr = this.data.fx?.rate;
+    let usdInr = this.fxRate();
     if (needsFx && usdInr === undefined) {
       try {
         usdInr = (await this.deps.market.getFxRate()).rate;
@@ -353,10 +395,7 @@ export class PortfolioController implements Disposable {
   // ---- internals ----
 
   private onHoldingsChanged(): void {
-    // Drop data for removed holdings and show the new list immediately; then fetch quotes.
-    const ids = new Set(this.deps.store.list().map((h) => h.id));
-    for (const id of [...this.data.quotes.keys()]) if (!ids.has(id)) this.data.quotes.delete(id);
-    for (const id of [...this.data.quoteErrors.keys()]) if (!ids.has(id)) this.data.quoteErrors.delete(id);
+    // Show the new list immediately (removed holdings disappear); then fetch quotes for any holding that has none.
     this.rebuild();
     void this.refresh('holdings');
   }
@@ -366,7 +405,7 @@ export class PortfolioController implements Disposable {
     this.pins = this.deps.pins?.list() ?? [];
     const defs = this.pinnedMarketDefs();
     this.rebuild();
-    // Newly pinned market rows need a quote now rather than at the next cycle.
+    // Newly pinned market rows need a quote now rather than at the next wake-up.
     if (defs.length > 0 && defs.map((d) => d.symbol).join(',') !== before) void this.refresh('settings');
   }
 
@@ -380,15 +419,95 @@ export class PortfolioController implements Disposable {
     return out;
   }
 
+  private fxRate(): number | undefined {
+    return this.entries.get(FX_KEY)?.quote?.price;
+  }
+
+  /** Everything the current holdings, pins and open watch-lists need quotes for, de-duplicated by quote key. */
+  private collectNeeds(): Need[] {
+    const { market } = this.deps;
+    const needs = new Map<string, Need>();
+    const add = (n: Need) => {
+      if (!needs.has(n.key)) needs.set(n.key, n);
+    };
+    const holdings = this.deps.store.list();
+    for (const h of holdings) add({ key: holdingQuoteKey(h), clock: clockForMarket(h.market), load: () => market.getQuote(h) });
+    if (holdings.some((h) => nativeCurrency(h.market) !== this.settings.baseCurrency)) {
+      add({ key: FX_KEY, clock: 'FX', load: () => market.getFxQuote() });
+    }
+    const marketDefs = [...(this.includeIndices ? INDICES : []), ...(this.includeCoins ? COINS : []), ...this.pinnedMarketDefs()];
+    for (const def of marketDefs) add({ key: marketQuoteKey(def), clock: clockForIndex(def), load: () => market.getMarketQuote(def) });
+    return [...needs.values()];
+  }
+
+  private intervalMs(clock: MarketClock): number {
+    return refreshIntervalMs(clock, this.settings.refreshIntervalSeconds, true);
+  }
+
+  /** When this quote should next be fetched (<= now means due). */
+  private dueAt(n: Need, now: number): number {
+    const e = this.entries.get(n.key);
+    const interval = this.intervalMs(n.clock);
+    const due = nextDueAt(n.clock, e?.at, now, interval);
+    if (e?.attemptAt !== undefined && (e.at === undefined || e.attemptAt > e.at)) {
+      // The last attempt failed: do not retry before the normal interval (sooner would hammer a failing endpoint).
+      return Math.max(due, e.attemptAt + (sessionAt(n.clock, now).open ? interval : CLOSED_RETRY_MS));
+    }
+    return due;
+  }
+
+  private buildData(): FetchedData {
+    const holdings = this.deps.store.list();
+    const quotes = new Map<string, Quote>();
+    const quoteErrors = new Map<string, string>();
+    for (const h of holdings) {
+      const e = this.entries.get(holdingQuoteKey(h));
+      if (e?.quote) quotes.set(h.id, e.quote);
+      if (e?.error) quoteErrors.set(h.id, e.error);
+    }
+    const fxEntry = this.entries.get(FX_KEY);
+    const fx = fxEntry?.quote ? { rate: fxEntry.quote.price, stale: fxEntry.error !== undefined } : undefined;
+    let fxError: string | undefined;
+    if (fxEntry?.error) fxError = fx ? 'Live USDINR rate unavailable; using last known rate.' : `USDINR rate unavailable: ${fxEntry.error}`;
+    const result = (index: IndexDef): IndexResult => {
+      const e = this.entries.get(marketQuoteKey(index));
+      return e?.quote ? { index, quote: e.quote } : { index, error: e?.error ?? 'No quote yet' };
+    };
+    const pinned = this.pinnedMarketDefs();
+    let lastUpdated: number | undefined;
+    for (const e of this.entries.values()) if (e.at !== undefined && (lastUpdated === undefined || e.at > lastUpdated)) lastUpdated = e.at;
+    if (lastUpdated === undefined) lastUpdated = this.lastAttemptAt;
+    return {
+      quotes,
+      quoteErrors,
+      fx,
+      fxError,
+      indices: this.includeIndices ? INDICES.map(result) : [],
+      coins: this.includeCoins ? COINS.map(result) : [],
+      pinnedMarkets: pinned.map(result),
+      finnhubIssue: this.finnhubIssue,
+      lastUpdated,
+    };
+  }
+
   private rebuild(loading = this.running !== undefined): void {
-    this.current = buildSnapshot(this.deps.store.list(), this.data, this.settings, loading, this.pins);
+    this.current = buildSnapshot(this.deps.store.list(), this.buildData(), this.settings, loading, this.pins);
     if (!this.disposed) this.updated.fire(this.current);
   }
 
+  /** Sleeps until the earliest quote is due (never longer than MAX_SLEEP_MS, so a long sleep / clock change is re-checked). */
   private schedule(): void {
     if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
     if (this.disposed) return;
-    this.timer = setTimeout(() => void this.refresh('timer'), this.settings.refreshIntervalSeconds * 1000);
+    const needs = this.collectNeeds();
+    if (needs.length === 0) return; // nothing to keep fresh: no timer at all
+    const now = this.now();
+    let due = Infinity;
+    for (const n of needs) due = Math.min(due, this.dueAt(n, now));
+    const jitter = this.random() * Math.min(MAX_JITTER_MS, this.settings.refreshIntervalSeconds * 50);
+    const delay = Math.min(MAX_SLEEP_MS, Math.max(MIN_SLEEP_MS, due - now + jitter));
+    this.timer = setTimeout(() => void this.refresh('timer'), delay);
     // Don't keep the Node process alive just for the timer (matters for tests / smoke scripts).
     (this.timer as { unref?: () => void }).unref?.();
   }
@@ -396,53 +515,32 @@ export class PortfolioController implements Disposable {
   private async doRefresh(reason: RefreshReason): Promise<void> {
     const { market } = this.deps;
     this.settings = this.deps.settings.get();
-    const holdings = this.deps.store.list();
-    if (reason !== 'holdings' && reason !== 'settings') market.clearQuoteCache();
-    if (this.data.lastUpdated === undefined) this.rebuild(true);
-
-    const quotes = new Map<string, Quote>();
-    const quoteErrors = new Map<string, string>();
-    const results = await mapSettled(holdings, 4, (h) => market.getQuote(h));
-    holdings.forEach((h, i) => {
-      const r = results[i];
-      if (r.ok) quotes.set(h.id, r.value);
-      else {
-        quoteErrors.set(h.id, r.error.message);
-        // keep showing the previous quote for this holding while flagging the error
-        const prev = this.data.quotes.get(h.id);
-        if (prev) quotes.set(h.id, prev);
-      }
-    });
-
-    let fx = this.data.fx;
-    let fxError: string | undefined;
-    if (holdings.some((h) => nativeCurrency(h.market) !== this.settings.baseCurrency)) {
-      try {
-        fx = await market.getFxRate();
-        if (fx.stale) fxError = 'Live USDINR rate unavailable; using last known rate.';
-      } catch (e) {
-        fxError = `USDINR rate unavailable: ${errorMessage(e)}`;
-      }
+    const force = reason === 'manual' || reason === 'key';
+    const now = this.now();
+    const todo = this.collectNeeds().filter((n) => force || this.dueAt(n, now) <= now);
+    if (todo.length === 0) {
+      if (this.current.loading) this.rebuild(false);
+      return;
     }
-
-    const indices = this.includeIndices ? await market.getIndexQuotes() : [];
-    const coins = this.includeCoins ? await market.getCoinQuotes() : [];
-
-    const pinnedDefs = this.pinnedMarketDefs();
-    const pinnedMarkets = pinnedDefs.length > 0 ? await market.getMarketQuotes(pinnedDefs) : [];
-
+    if (this.lastAttemptAt === undefined) this.rebuild(true);
+    market.clearQuoteCache();
+    const results = await mapSettled(todo, 4, (n) => n.load());
+    const done = this.now();
+    this.lastAttemptAt = done;
+    todo.forEach((n, i) => {
+      const r = results[i];
+      const prev = this.entries.get(n.key);
+      if (r.ok) this.entries.set(n.key, { quote: r.value, at: done, attemptAt: done });
+      else this.entries.set(n.key, { quote: prev?.quote, at: prev?.at, attemptAt: done, error: r.error.message });
+    });
     const issue = market.getFinnhubIssue();
-    this.data = {
-      quotes,
-      quoteErrors,
-      fx,
-      fxError,
-      indices,
-      coins,
-      pinnedMarkets,
-      finnhubIssue: issue ? FINNHUB_MESSAGES[issue] : undefined,
-      lastUpdated: this.now(),
-    };
+    this.finnhubIssue = issue ? FINNHUB_MESSAGES[issue] : undefined;
     this.rebuild(false);
   }
+}
+
+const FX_KEY = 'fx';
+
+function marketQuoteKey(def: IndexDef): string {
+  return `i:${def.symbol}`;
 }

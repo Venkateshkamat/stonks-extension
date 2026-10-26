@@ -1,9 +1,12 @@
 import * as assert from 'assert';
-import { mock } from 'node:test';
 import { fixture } from '../helpers';
 import { setup } from '../controllerSetup';
+import { FakeTimers } from '../fakeTimers';
 import { buildSnapshot, PortfolioSnapshot } from '../../src/portfolio/controller';
 import { DEFAULT_SETTINGS } from '../../src/settings';
+
+/** Tue 2026-10-27 10:30 IST: NSE open, US closed. */
+const NSE_OPEN = Date.parse('2026-10-27T05:00:00Z');
 
 describe('PortfolioController', () => {
   it('starts empty, then computes a snapshot with quotes, totals and fx in base currency', async () => {
@@ -104,9 +107,10 @@ describe('PortfolioController', () => {
   });
 
   it('setRefreshIntervalSeconds writes the setting and reschedules the timer', async () => {
-    mock.timers.enable({ apis: ['setTimeout'] });
+    const { store, controller, settings, fetch, clock } = setup({ settings: { refreshIntervalSeconds: 600 }, now: NSE_OPEN });
+    const timers = new FakeTimers(clock);
+    timers.install();
     try {
-      const { store, controller, settings, fetch } = setup({ settings: { refreshIntervalSeconds: 600 } });
       await store.add({ symbol: 'RELIANCE', market: 'NSE', quantity: 1, buyPrice: 1 });
       await controller.start();
       const n = () => fetch.calls.filter((c) => c.includes('RELIANCE.NS')).length;
@@ -115,16 +119,13 @@ describe('PortfolioController', () => {
       await controller.setRefreshIntervalSeconds(20);
       assert.strictEqual(settings.value.refreshIntervalSeconds, 20);
       assert.strictEqual(controller.currentRefreshIntervalSeconds, 20);
-      mock.timers.tick(19_000);
-      await new Promise((r) => setImmediate(r));
+      await timers.advance(19_000);
       assert.strictEqual(n(), n0, 'no refresh before the new interval');
-      mock.timers.tick(1_000);
-      await new Promise((r) => setImmediate(r));
-      await new Promise((r) => setImmediate(r));
+      await timers.advance(1_000);
       assert.strictEqual(n(), n0 + 1, 'refreshed after the new 20s interval, not the old 600s');
       controller.dispose();
     } finally {
-      mock.timers.reset();
+      timers.uninstall();
     }
   });
 
@@ -174,23 +175,21 @@ describe('PortfolioController', () => {
   });
 
   it('refreshes on the configured interval', async () => {
-    mock.timers.enable({ apis: ['setTimeout'] });
+    const { store, controller, fetch, clock } = setup({ settings: { refreshIntervalSeconds: 30 }, now: NSE_OPEN });
+    const timers = new FakeTimers(clock);
+    timers.install();
     try {
-      const { store, controller, fetch } = setup({ settings: { refreshIntervalSeconds: 30 } });
       await store.add({ symbol: 'RELIANCE', market: 'NSE', quantity: 1, buyPrice: 1 });
       await controller.start();
       const after = () => fetch.calls.filter((c) => c.includes('RELIANCE.NS')).length;
       const n0 = after();
-      mock.timers.tick(29_000);
-      await Promise.resolve();
+      await timers.advance(29_000);
       assert.strictEqual(after(), n0, 'no refresh before the interval');
-      mock.timers.tick(1_000);
-      await new Promise((r) => setImmediate(r));
-      await new Promise((r) => setImmediate(r));
+      await timers.advance(1_000);
       assert.strictEqual(after(), n0 + 1, 'refreshed after 30s');
       controller.dispose();
     } finally {
-      mock.timers.reset();
+      timers.uninstall();
     }
   });
 

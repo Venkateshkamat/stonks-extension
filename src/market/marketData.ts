@@ -114,10 +114,15 @@ export class MarketDataService {
     return this.yahoo.getQuote(ref.symbol, ref.market);
   }
 
+  /** USD -> INR quote from Yahoo (throws when the fetch fails; callers keep their last known rate). */
+  getFxQuote(): Promise<Quote> {
+    return this.cachedQuote('fx', false, () => this.yahoo.getQuoteRaw(FX_SYMBOL));
+  }
+
   /** USD -> INR rate from Yahoo. Falls back to the last known rate (stale: true) when the fetch fails. */
   async getFxRate(): Promise<FxResult> {
     try {
-      const q = await this.cachedQuote('fx', false, () => this.yahoo.getQuoteRaw(FX_SYMBOL));
+      const q = await this.getFxQuote();
       this.lastFx = q.price;
       return { rate: q.price, stale: false };
     } catch (e) {
@@ -135,12 +140,14 @@ export class MarketDataService {
     return this.getMarketQuotes(COINS);
   }
 
+  /** Quote for one watch-list market (index or coin) by Yahoo symbol. Coins trade 24/7: their day change is the rolling 24h one. */
+  getMarketQuote(index: IndexDef): Promise<Quote> {
+    return this.cachedQuote(`i:${index.symbol}`, false, () => this.yahoo.getQuoteRaw(index.symbol, index.region === 'Crypto'));
+  }
+
   /** Quotes for watch-list markets (indices and coins) by Yahoo symbol, with per-symbol errors. */
   async getMarketQuotes(defs: readonly IndexDef[]): Promise<IndexResult[]> {
-    const settled = await mapSettled(defs, this.concurrency, (index) =>
-      // Coins trade 24/7: their day change is the rolling 24h one, like crypto holdings.
-      this.cachedQuote(`i:${index.symbol}`, false, () => this.yahoo.getQuoteRaw(index.symbol, index.region === 'Crypto')),
-    );
+    const settled = await mapSettled(defs, this.concurrency, (index) => this.getMarketQuote(index));
     return defs.map((index, i) => {
       const r = settled[i];
       return r.ok ? { index, quote: r.value } : { index, error: errorMessage(r.error) };
