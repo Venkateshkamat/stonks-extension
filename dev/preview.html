@@ -14,8 +14,8 @@
   The strip at the bottom mocks the status bar: the main item (stocks | crypto) and the pinned tickers; the pin
   buttons in the panel add / remove them.
 
-  Query params: ?variant=shown|hidden|usd|errors|loading|empty  &theme=dark|light  &range=1D|15D|30D
-  The currency toggle and the 1D | 15D | 30D selector in the page are live (the mock answers them).
+  Query params: ?variant=shown|hidden|usd|errors|loading|empty  &theme=dark|light  &range=1D|15D|30D  &view=stocks|crypto
+  The Stocks | Crypto switcher, the currency toggle and the 1D | 15D | 30D selector in the page are live (the mock answers them).
   Mock data comes from dev/preview-data.js (npm run preview:data regenerates it from the real model builders).
 -->
 <link rel="stylesheet" href="../dist/media/panel.css">
@@ -61,6 +61,7 @@
   var params = new URLSearchParams(location.search);
   var MOCK = window.STONKS_MOCK;
   var current = MOCK[params.get('variant')] ? params.get('variant') : 'shown';
+  var view = ['stocks', 'crypto'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'stocks';
   var range = ['1D', '15D', '30D'].indexOf(params.get('range')) >= 0 ? params.get('range') : '30D';
 
   var THEMES = {
@@ -165,7 +166,7 @@
   function deliver(data) { window.dispatchEvent(new MessageEvent('message', { data: data })); }
 
   function sendModel(name, opts) {
-    var model = withPins(Object.assign({}, MOCK[name].model, { chartRange: range }));
+    var model = withPins(Object.assign({}, MOCK[name].views[view].model, { chartRange: range }));
     if (opts && opts.loading) model.loading = true;
     renderStatusBar();
     deliver({ type: 'state', model: model });
@@ -177,12 +178,12 @@
   }
 
   function sendChart(name) {
-    var chart = MOCK[name].charts[range];
+    var chart = MOCK[name].views[view].charts[range];
     if (chart === undefined) return;
     // The real extension posts `chart: null` while history loads, then the chart.
     deliver({ type: 'history', chart: null });
-    var r = range;
-    setTimeout(function () { if (current === name && range === r) deliver({ type: 'history', chart: chart }); }, 250);
+    var r = range, v = view;
+    setTimeout(function () { if (current === name && range === r && view === v) deliver({ type: 'history', chart: chart }); }, 250);
   }
 
   function setVariant(name) {
@@ -203,6 +204,9 @@
           if (i >= 0) pinnedKeys.splice(i, 1);
           else pinnedKeys.push(msg.key);
           sendModel(current);
+        } else if (msg.type === 'setView') {
+          view = msg.view;
+          sendState(current);
         } else if (msg.type === 'setRange') {
           range = msg.range;
           sendState(current);
@@ -210,8 +214,8 @@
         else if (msg.type === 'action' && msg.action === 'toggleHide') setVariant(current === 'hidden' ? 'shown' : 'hidden');
         else if (msg.type === 'action' && msg.action === 'refresh') {
           var name = current;
-          deliver({ type: 'state', model: withPins(Object.assign({}, MOCK[name].model, { chartRange: range, loading: true })) });
-          setTimeout(function () { if (current === name) deliver({ type: 'state', model: withPins(Object.assign({}, MOCK[name].model, { chartRange: range })) }); }, 800);
+          deliver({ type: 'state', model: withPins(Object.assign({}, MOCK[name].views[view].model, { chartRange: range, loading: true })) });
+          setTimeout(function () { if (current === name) deliver({ type: 'state', model: withPins(Object.assign({}, MOCK[name].views[view].model, { chartRange: range })) }); }, 800);
         }
       },
       getState: function () { return undefined; },

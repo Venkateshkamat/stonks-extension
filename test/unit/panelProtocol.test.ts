@@ -12,8 +12,9 @@ describe('parseWebviewMessage', () => {
   });
 
   it('accepts diag and error reports from the webview, normalising their fields', () => {
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3, pinButtons: 9 }), { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3, pinButtons: 9 });
-    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0, rangeButtons: 0, pinButtons: 0 });
+    const full = { type: 'diag', chartLib: true, chartRendered: false, holdingRows: 3, currencyButtons: 2, rangeButtons: 3, pinButtons: 9, viewButtons: 2, view: 'crypto', marketRows: 5 };
+    assert.deepStrictEqual(parseWebviewMessage(full), full);
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'diag', chartLib: 'yes' }), { type: 'diag', chartLib: false, chartRendered: false, holdingRows: 0, currencyButtons: 0, rangeButtons: 0, pinButtons: 0, viewButtons: 0, view: '', marketRows: 0 });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 'boom' }), { type: 'error', message: 'boom' });
     assert.deepStrictEqual(parseWebviewMessage({ type: 'error', message: 42 }), { type: 'error', message: 'unknown error' });
     const long = parseWebviewMessage({ type: 'error', message: 'x'.repeat(5000) });
@@ -37,6 +38,18 @@ describe('parseWebviewMessage', () => {
   it('accepts only 1D / 15D / 30D for setRange', () => {
     for (const range of ['1D', '15D', '30D']) assert.deepStrictEqual(parseWebviewMessage({ type: 'setRange', range, x: 1 }), { type: 'setRange', range });
     for (const bad of ['7D', '1d', '', 30, undefined, null]) assert.strictEqual(parseWebviewMessage({ type: 'setRange', range: bad }), undefined);
+  });
+
+  it('accepts only known views for setView', () => {
+    for (const view of ['stocks', 'crypto']) assert.deepStrictEqual(parseWebviewMessage({ type: 'setView', view, x: 1 }), { type: 'setView', view });
+    for (const bad of ['Stocks', 'bonds', '', 1, undefined, null, {}]) assert.strictEqual(parseWebviewMessage({ type: 'setView', view: bad }), undefined);
+  });
+
+  it('add carries an optional stocks / crypto group and ignores anything else', () => {
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'action', action: 'add' }), { type: 'action', action: 'add' });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'action', action: 'add', group: 'crypto' }), { type: 'action', action: 'add', group: 'crypto' });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'action', action: 'add', group: 'stocks' }), { type: 'action', action: 'add', group: 'stocks' });
+    assert.deepStrictEqual(parseWebviewMessage({ type: 'action', action: 'add', group: 'evil' }), { type: 'action', action: 'add' });
   });
 
   it('rejects anything unexpected', () => {

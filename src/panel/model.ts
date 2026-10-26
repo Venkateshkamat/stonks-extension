@@ -7,10 +7,13 @@ import {
   formatSignedMoney,
   formatSignedNumber,
 } from '../format';
+import { IndexResult, sourceLabel } from '../market/marketData';
 import { HoldingRow, PortfolioSnapshot } from '../portfolio/controller';
+import { PortfolioTotals } from '../portfolio/calc';
 import { holdingPin, pinKey } from '../portfolio/pins';
-import { nativeCurrency, PortfolioGroup } from '../symbols';
+import { marketGroup, nativeCurrency, PortfolioGroup } from '../symbols';
 import { ChartRange, DEFAULT_CHART_RANGE } from '../types';
+import { DEFAULT_PANEL_VIEW, PanelView } from './views';
 
 /** Serializable view model posted to the webview. All formatting happens here so the webview stays dumb. */
 
@@ -62,12 +65,14 @@ export interface IndexGroupModel {
 }
 
 export interface PanelModel {
+  /** Selected view (drives the Stocks | Crypto switcher). */
+  view: PanelView;
   hideAmounts: boolean;
   baseCurrency: string;
   /** Selected chart range (drives the 1D | 15D | 30D selector). */
   chartRange: ChartRange;
   loading: boolean;
-  /** True when there are no holdings (show the empty state). */
+  /** True when the selected view has no holdings (show its empty state). */
   empty: boolean;
   /** Pre-formatted "last updated" time. */
   updated?: string;
@@ -79,8 +84,13 @@ export interface PanelModel {
   cards: HeaderCard[];
   columns: Column[];
   rows: RowModel[];
+  /** Markets table: indices (Stocks view) or major coins (Crypto view). */
   indices: IndexGroupModel[];
   indicesLoading: boolean;
+  marketsTitle: string;
+  /** Column headings of the Markets table. */
+  marketsNameLabel: string;
+  marketsLevelLabel: string;
   /** Portfolio-wide issues (FX, Finnhub, excluded holdings). Per-symbol errors are inline on rows / indices. */
   warnings: string[];
 }
@@ -90,6 +100,8 @@ export interface PanelModelOptions {
   formatTime?: (ms: number) => string;
   /** Selected chart range; defaults to 30D. */
   range?: ChartRange;
+  /** Selected view; defaults to Stocks. */
+  view?: PanelView;
 }
 
 const MUTED: Cell = { text: '--', tone: 'muted' };
@@ -145,27 +157,27 @@ function buildRow(r: HoldingRow, hide: boolean, pinned: ReadonlySet<string>): Ro
   return { id: h.id, label: `${h.market}:${h.symbol}`, cells, pinKey: key, pinned: pinned.has(key), error: r.error };
 }
 
-function buildCards(s: PortfolioSnapshot): HeaderCard[] {
-  const t = s.totals;
+function buildCards(t: PortfolioTotals | undefined, hideAmounts: boolean): HeaderCard[] {
   if (!t) return [];
   const cur = t.currency;
-  const pl: HeaderCard = s.hideAmounts
+  const hide = hideAmounts;
+  const pl: HeaderCard = hide
     ? { label: 'Total P/L', main: percentCell(t.pnlPercent) }
     : { label: 'Total P/L', main: signed(formatSignedMoney(t.pnl, cur), t.pnl), sub: percentCell(t.pnlPercent) };
-  const today: HeaderCard = s.hideAmounts
+  const today: HeaderCard = hide
     ? { label: 'Today', main: percentCell(t.dayChangePercent) }
     : { label: 'Today', main: signed(formatSignedMoney(t.dayChange, cur), t.dayChange), sub: percentCell(t.dayChangePercent) };
-  return s.hideAmounts
+  return hide
     ? [pl, today]
     : [{ label: 'Current value', main: { text: formatMoney(t.current, cur) } }, { label: 'Invested', main: { text: formatMoney(t.invested, cur) } }, pl, today];
 }
 
-function buildIndices(s: PortfolioSnapshot, pinned: ReadonlySet<string>): IndexGroupModel[] {
+function buildIndices(indices: readonly IndexResult[], pinned: ReadonlySet<string>): IndexGroupModel[] {
   const groups: IndexGroupModel[] = [];
   for (const region of ['India', 'US'] as const) {
     const locale = region === 'India' ? 'en-IN' : 'en-US';
     const items: IndexItemModel[] = [];
-    for (const r of s.indices) {
+    for (const r of indices) {
       if (r.index.region !== region) continue;
       const q = r.quote;
       const key = pinKey({ kind: 'market', symbol: r.index.symbol });
@@ -184,41 +196,79 @@ function buildIndices(s: PortfolioSnapshot, pinned: ReadonlySet<string>): IndexG
   return groups;
 }
 
+/** Signed per-unit price change that keeps sub-dollar coins readable: +$880.00 / -$0.012. */
+function signedPrice(n: number, cur: 'INR' | 'USD'): string {
+  if (n === 0) return formatPrice(0, cur);
+  return n < 0 ? `-${formatPrice(-n, cur)}` : `+${formatPrice(n, cur)}`;
+}
+
+/** The Crypto view's Markets table: one group of priced coin rows. */
+function buildCoins(coins: readonly IndexResult[], pinned: ReadonlySet<string>): IndexGroupModel[] {
+  const items: IndexItemModel[] = coins.map((r) => {
+    const q = r.quote;
+    const cur = r.index.currency ?? 'USD';
+    const key = pinKey({ kind: 'market', symbol: r.index.symbol });
+    return {
+      name: r.index.name,
+      pinKey: key,
+      pinned: pinned.has(key),
+      level: q ? { text: formatPrice(q.price, cur) } : MUTED,
+      change: q ? { text: signedPrice(q.change, cur), tone: toneOf(q.change) } : MUTED,
+      percent: q ? percentCell(q.changePercent) : MUTED,
+      error: q ? undefined : r.error,
+    };
+  });
+  return items.length > 0 ? [{ region: 'Crypto', items }] : [];
+}
+
 export function buildPanelModel(s: PortfolioSnapshot, opts: PanelModelOptions = {}): PanelModel {
   const formatTime = opts.formatTime ?? ((ms: number) => new Date(ms).toLocaleTimeString());
+  const view = opts.view ?? DEFAULT_PANEL_VIEW;
+  const rows = s.holdings.filter((r) => marketGroup(r.holding.market) === view);
+  const summary = s.groups.find((g) => g.group === view);
+  const totals = summary?.totals;
+  const crossCurrency = rows.some((r) => nativeCurrency(r.holding.market) !== s.baseCurrency);
+
   const warnings: string[] = [];
-  for (const e of s.errors) if (e.scope === 'fx' || e.scope === 'finnhub') warnings.push(`${e.label}: ${e.message}`);
-  if (s.totals && s.totals.skipped > 0) {
-    warnings.push(`${s.totals.skipped} holding(s) excluded from totals (no quote or FX rate).`);
+  for (const e of s.errors) {
+    if (e.scope === 'finnhub' || (e.scope === 'fx' && crossCurrency)) warnings.push(`${e.label}: ${e.message}`);
+  }
+  if (totals && totals.skipped > 0) {
+    warnings.push(`${totals.skipped} holding(s) excluded from totals (no quote or FX rate).`);
   }
 
   let statusMessage: string | undefined;
-  if (s.hasHoldings && !s.totals) {
+  if (rows.length > 0 && !totals) {
     statusMessage = s.loading || s.lastUpdated === undefined ? 'Loading quotes...' : 'Could not load quotes. See the errors below.';
   }
 
   const pinned = new Set(s.pins.map((p) => p.key));
-  const crossCurrency = s.holdings.some((r) => nativeCurrency(r.holding.market) !== s.baseCurrency);
   const fx =
     s.fxRate !== undefined && crossCurrency
       ? `1 USD = ${formatMoney(s.fxRate, 'INR')}${s.fxStale ? ' (stale)' : ''}`
       : undefined;
+  const sources = [...new Set(rows.flatMap((r) => (r.quote ? [r.quote.source] : [])))];
+  const crypto = view === 'crypto';
 
   return {
+    view,
     hideAmounts: s.hideAmounts,
     baseCurrency: s.baseCurrency,
     chartRange: opts.range ?? DEFAULT_CHART_RANGE,
     loading: s.loading,
-    empty: !s.hasHoldings,
+    empty: rows.length === 0,
     updated: s.lastUpdated !== undefined ? formatTime(s.lastUpdated) : undefined,
-    dataSource: s.hasHoldings && s.sources.length > 0 ? s.dataSource : undefined,
+    dataSource: sources.length > 0 ? sourceLabel(sources) : undefined,
     fx,
     statusMessage,
-    cards: buildCards(s),
+    cards: buildCards(totals, s.hideAmounts),
     columns: buildColumns(s.hideAmounts),
-    rows: s.holdings.map((r) => buildRow(r, s.hideAmounts, pinned)),
-    indices: buildIndices(s, pinned),
-    indicesLoading: s.indices.length === 0,
+    rows: rows.map((r) => buildRow(r, s.hideAmounts, pinned)),
+    indices: crypto ? buildCoins(s.coins, pinned) : buildIndices(s.indices, pinned),
+    indicesLoading: (crypto ? s.coins : s.indices).length === 0,
+    marketsTitle: crypto ? 'Major coins' : 'Markets',
+    marketsNameLabel: crypto ? 'Coin' : 'Index',
+    marketsLevelLabel: crypto ? 'Price' : 'Level',
     warnings,
   };
 }
@@ -237,6 +287,6 @@ export function historyKey(
     s.hideAmounts,
     range,
     group ?? null,
-    s.holdings.map(({ holding: h }) => [h.id, h.symbol, h.market, h.quantity, h.buyPrice, h.buyDate ?? null]),
+    s.holdings.filter(({ holding: h }) => !group || marketGroup(h.market) === group).map(({ holding: h }) => [h.id, h.symbol, h.market, h.quantity, h.buyPrice, h.buyDate ?? null]),
   ]);
 }

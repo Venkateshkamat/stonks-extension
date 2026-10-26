@@ -47,6 +47,8 @@ export interface PortfolioSnapshot {
   groups: GroupSummary[];
   /** Index quotes; empty unless indices were requested via setIncludeIndices(true). */
   indices: IndexResult[];
+  /** Major-coin quotes; empty unless requested via setIncludeCoins(true) (the panel's Crypto view). */
+  coins: IndexResult[];
   /** Pinned tickers resolved against the latest quotes, in pin order (status bar items). */
   pins: PinItem[];
   /** USD -> INR; undefined if never fetched / not needed. */
@@ -82,6 +84,8 @@ export interface FetchedData {
   fx?: { rate: number; stale: boolean };
   fxError?: string;
   indices: IndexResult[];
+  /** Quotes for the major coins (only while the Crypto view is open). */
+  coins?: IndexResult[];
   /** Quotes for pinned market rows (fetched even when the panel is closed). */
   pinnedMarkets?: IndexResult[];
   finnhubIssue?: string;
@@ -123,7 +127,7 @@ export function buildSnapshot(
   if (data.fxError && holdings.some((h) => nativeCurrency(h.market) !== settings.baseCurrency)) {
     errors.push({ scope: 'fx', label: 'USDINR', message: data.fxError });
   }
-  for (const i of data.indices) if (i.error) errors.push({ scope: 'index', label: i.index.name, message: i.error });
+  for (const i of [...data.indices, ...(data.coins ?? [])]) if (i.error) errors.push({ scope: 'index', label: i.index.name, message: i.error });
   if (data.finnhubIssue) errors.push({ scope: 'finnhub', label: 'Finnhub', message: data.finnhubIssue });
 
   const sources = [...new Set(priced.map((r) => r.quote!.source))];
@@ -138,6 +142,7 @@ export function buildSnapshot(
       return [{ group, holdings: inGroup.length, totals: hasQuote ? computeTotals(inGroup, settings.baseCurrency, data.fx?.rate) : undefined }];
     }),
     indices: data.indices,
+    coins: data.coins ?? [],
     pins: buildPinItems(pins, rows, data.pinnedMarkets ?? []),
     fxRate: data.fx?.rate,
     fxStale: data.fx?.stale ?? false,
@@ -176,6 +181,7 @@ export class PortfolioController implements Disposable {
   private running?: Promise<void>;
   private rerun?: RefreshReason;
   private includeIndices = false;
+  private includeCoins = false;
   private pins: Pin[] = [];
   private disposed = false;
   private readonly now: () => number;
@@ -205,15 +211,27 @@ export class PortfolioController implements Disposable {
     return this.refresh('start');
   }
 
-  /** Whether refreshes should also fetch index quotes (the webview turns this on while open). */
+  /** Whether refreshes should also fetch index quotes (the panel's Stocks view turns this on while shown). */
   setIncludeIndices(on: boolean): void {
-    if (this.includeIndices === on) return;
-    this.includeIndices = on;
-    if (on) void this.refresh('settings');
-    else {
-      this.data = { ...this.data, indices: [] };
-      this.rebuild();
-    }
+    this.setWatchlists({ indices: on });
+  }
+
+  /** Whether refreshes should also fetch the major coins' quotes (the panel's Crypto view turns this on while shown). */
+  setIncludeCoins(on: boolean): void {
+    this.setWatchlists({ coins: on });
+  }
+
+  /** Sets both Markets-table watch-lists at once (one refresh at most); omitted keys are left as they are. */
+  setWatchlists(w: { indices?: boolean; coins?: boolean }): void {
+    const indices = w.indices ?? this.includeIndices;
+    const coins = w.coins ?? this.includeCoins;
+    if (indices === this.includeIndices && coins === this.includeCoins) return;
+    const turnedOn = (indices && !this.includeIndices) || (coins && !this.includeCoins);
+    this.includeIndices = indices;
+    this.includeCoins = coins;
+    this.data = { ...this.data, indices: indices ? this.data.indices : [], coins: coins ? this.data.coins : [] };
+    this.rebuild();
+    if (turnedOn) void this.refresh('settings');
   }
 
   /** Re-reads settings after a configuration change. No network call unless needed. */
@@ -407,8 +425,8 @@ export class PortfolioController implements Disposable {
       }
     }
 
-    let indices = this.data.indices;
-    if (this.includeIndices) indices = await market.getIndexQuotes();
+    const indices = this.includeIndices ? await market.getIndexQuotes() : [];
+    const coins = this.includeCoins ? await market.getCoinQuotes() : [];
 
     const pinnedDefs = this.pinnedMarketDefs();
     const pinnedMarkets = pinnedDefs.length > 0 ? await market.getMarketQuotes(pinnedDefs) : [];
@@ -420,6 +438,7 @@ export class PortfolioController implements Disposable {
       fx,
       fxError,
       indices,
+      coins,
       pinnedMarkets,
       finnhubIssue: issue ? FINNHUB_MESSAGES[issue] : undefined,
       lastUpdated: this.now(),

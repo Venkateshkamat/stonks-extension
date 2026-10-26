@@ -58,10 +58,12 @@ export interface SymbolRef {
 }
 
 export interface IndexDef {
-  /** Yahoo symbol, e.g. ^NSEI */
+  /** Yahoo symbol, e.g. ^NSEI or BTC-USD */
   symbol: string;
   name: string;
-  region: 'India' | 'US';
+  region: 'India' | 'US' | 'Crypto';
+  /** Quote currency for rows that are priced (coins); indices are plain levels and leave it out. */
+  currency?: Currency;
 }
 
 export const INDICES: readonly IndexDef[] = [
@@ -73,9 +75,18 @@ export const INDICES: readonly IndexDef[] = [
   { symbol: '^IXIC', name: 'Nasdaq Composite', region: 'US' },
 ];
 
-/** Resolves a watch-list market symbol (an index today; crypto coins in the crypto view) to its definition. */
+/** Major coins shown in the Crypto view's Markets table (Yahoo `X-USD`). */
+export const COINS: readonly IndexDef[] = [
+  { symbol: 'BTC-USD', name: 'BTC', region: 'Crypto', currency: 'USD' },
+  { symbol: 'ETH-USD', name: 'ETH', region: 'Crypto', currency: 'USD' },
+  { symbol: 'SOL-USD', name: 'SOL', region: 'Crypto', currency: 'USD' },
+  { symbol: 'BNB-USD', name: 'BNB', region: 'Crypto', currency: 'USD' },
+  { symbol: 'XRP-USD', name: 'XRP', region: 'Crypto', currency: 'USD' },
+];
+
+/** Resolves a watch-list market symbol (an index, or a coin in the Crypto view) to its definition. */
 export function findMarketDef(symbol: string): IndexDef | undefined {
-  return INDICES.find((i) => i.symbol === symbol);
+  return INDICES.find((i) => i.symbol === symbol) ?? COINS.find((c) => c.symbol === symbol);
 }
 
 export const FX_SYMBOL = 'USDINR=X';

@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import { buildPanelModel, historyKey, toneOf } from '../../src/panel/model';
 import { buildSnapshot, FetchedData } from '../../src/portfolio/controller';
 import { DEFAULT_SETTINGS, Settings } from '../../src/settings';
-import { Holding, INDICES, Quote } from '../../src/types';
+import { COINS, Holding, INDICES, Quote } from '../../src/types';
 
 const NOW = 1_700_000_000_000;
 
@@ -37,13 +37,13 @@ describe('buildPanelModel', () => {
   describe('with amounts shown (INR base)', () => {
     const model = buildPanelModel(snapshot([reliance, aapl, doge]), { formatTime: fmtTime });
 
-    it('formats the header cards in the base currency', () => {
-      // invested: 10000 + 500*80 + 80*80 = 56400 ; current: 11900 + 450*80 + 83.2*80 = 54556
+    it('formats the header cards in the base currency (stocks view: the crypto holding is not included)', () => {
+      // invested: 10000 + 500*80 = 50000 ; current: 11900 + 450*80 = 47900
       const labels = model.cards.map((c) => c.label);
       assert.deepStrictEqual(labels, ['Current value', 'Invested', 'Total P/L', 'Today']);
-      assert.strictEqual(model.cards[0].main.text, '₹54,556.00');
-      assert.strictEqual(model.cards[1].main.text, '₹56,400.00');
-      assert.strictEqual(model.cards[2].main.text, '-₹1,844.00');
+      assert.strictEqual(model.cards[0].main.text, '₹47,900.00');
+      assert.strictEqual(model.cards[1].main.text, '₹50,000.00');
+      assert.strictEqual(model.cards[2].main.text, '-₹2,100.00');
       assert.strictEqual(model.cards[2].main.tone, 'loss');
       assert.ok(model.cards[2].sub?.text.endsWith('%'));
     });
@@ -69,8 +69,8 @@ describe('buildPanelModel', () => {
       assert.strictEqual(model.rows[1].cells[8].tone, 'loss');
     });
 
-    it('keeps precision for sub-dollar crypto prices', () => {
-      const r = model.rows[2].cells.map((c) => c.text);
+    it('keeps precision for sub-dollar crypto prices (Crypto view)', () => {
+      const r = buildPanelModel(snapshot([reliance, aapl, doge]), { view: 'crypto' }).rows[0].cells.map((c) => c.text);
       assert.strictEqual(r[3], '$0.08');
       assert.strictEqual(r[4], '$0.0832');
     });
@@ -221,6 +221,107 @@ describe('buildPanelModel', () => {
     const m = buildPanelModel(snapshot([reliance, aapl, doge]));
     assert.deepStrictEqual(JSON.parse(JSON.stringify(m)), JSON.parse(JSON.stringify(m)));
     assert.ok(!JSON.stringify(m).includes('undefined'));
+  });
+});
+
+describe('buildPanelModel views', () => {
+  const all = [reliance, aapl, doge];
+  const stocks = buildPanelModel(snapshot(all), { formatTime: fmtTime, view: 'stocks' });
+  const crypto = buildPanelModel(snapshot(all), { formatTime: fmtTime, view: 'crypto' });
+
+  it('defaults to the Stocks view', () => {
+    assert.strictEqual(buildPanelModel(snapshot(all)).view, 'stocks');
+    assert.strictEqual(crypto.view, 'crypto');
+  });
+
+  it('Stocks shows only NSE / BSE / US rows, Crypto only CRYPTO rows', () => {
+    assert.deepStrictEqual(stocks.rows.map((r) => r.label), ['NSE:RELIANCE', 'US:AAPL']);
+    assert.deepStrictEqual(crypto.rows.map((r) => r.label), ['CRYPTO:DOGE']);
+    assert.strictEqual(stocks.empty, false);
+    assert.strictEqual(crypto.empty, false);
+  });
+
+  it('each view has its own totals in the base currency', () => {
+    // crypto: invested 1000 * 0.08 * 80 = 6400, current 1000 * 0.0832 * 80 = 6656
+    assert.deepStrictEqual(crypto.cards.map((c) => c.label), ['Current value', 'Invested', 'Total P/L', 'Today']);
+    assert.strictEqual(crypto.cards[0].main.text, '₹6,656.00');
+    assert.strictEqual(crypto.cards[1].main.text, '₹6,400.00');
+    assert.strictEqual(crypto.cards[2].main.text, '+₹256.00');
+    assert.strictEqual(crypto.cards[2].sub?.text, '+4.00%');
+    assert.strictEqual(stocks.cards[0].main.text, '₹47,900.00');
+  });
+
+  it('USD base: the crypto view needs no FX rate, so no fx note and no fx warning', () => {
+    const s = snapshot([doge, reliance], { fx: undefined, fxError: 'down' }, { baseCurrency: 'USD' });
+    const c = buildPanelModel(s, { view: 'crypto' });
+    assert.strictEqual(c.fx, undefined);
+    assert.deepStrictEqual(c.warnings, []);
+    assert.strictEqual(c.cards[0].main.text, '$83.20');
+    const st = buildPanelModel(s, { view: 'stocks' });
+    assert.ok(st.warnings.some((w) => w.startsWith('USDINR')), 'the stocks view still warns about the missing rate');
+  });
+
+  it('shows the per-view empty state when the view has no holdings, even if the other has', () => {
+    const onlyStocks = snapshot([reliance, aapl]);
+    const c = buildPanelModel(onlyStocks, { view: 'crypto' });
+    assert.strictEqual(c.empty, true);
+    assert.deepStrictEqual(c.rows, []);
+    assert.deepStrictEqual(c.cards, []);
+    assert.strictEqual(c.statusMessage, undefined);
+    assert.strictEqual(c.dataSource, undefined);
+    assert.strictEqual(buildPanelModel(onlyStocks, { view: 'stocks' }).empty, false);
+    const onlyCrypto = snapshot([doge]);
+    assert.strictEqual(buildPanelModel(onlyCrypto, { view: 'stocks' }).empty, true);
+  });
+
+  it('loading message is per view', () => {
+    const s = snapshot([reliance, doge], { quotes: new Map(), lastUpdated: undefined }, {}, true);
+    assert.strictEqual(buildPanelModel(s, { view: 'crypto' }).statusMessage, 'Loading quotes...');
+    assert.strictEqual(buildPanelModel(snapshot([reliance]), { view: 'crypto' }).statusMessage, undefined);
+  });
+
+  it('Markets: indices in the Stocks view, coins in the Crypto view', () => {
+    const indices = INDICES.map((index) => ({ index, quote: quote(index.symbol, 100, 99, 'USD') }));
+    const coins = COINS.map((index, i) => ({ index, quote: quote(index.symbol, i === 4 ? 0.5231 : 67420.5, i === 4 ? 0.5 : 66810, 'USD') }));
+    const s = snapshot(all, { indices, coins });
+    const st = buildPanelModel(s, { view: 'stocks' });
+    assert.strictEqual(st.marketsTitle, 'Markets');
+    assert.deepStrictEqual(st.indices.map((g) => g.region), ['India', 'US']);
+    const c = buildPanelModel(s, { view: 'crypto' });
+    assert.strictEqual(c.marketsTitle, 'Major coins');
+    assert.strictEqual(c.marketsNameLabel, 'Coin');
+    assert.strictEqual(c.marketsLevelLabel, 'Price');
+    assert.deepStrictEqual(c.indices.map((g) => g.region), ['Crypto']);
+    assert.deepStrictEqual(c.indices[0].items.map((i) => i.name), ['BTC', 'ETH', 'SOL', 'BNB', 'XRP']);
+    const btc = c.indices[0].items[0];
+    assert.strictEqual(btc.level.text, '$67,420.50');
+    assert.strictEqual(btc.change.text, '+$610.50');
+    assert.strictEqual(btc.change.tone, 'gain');
+    assert.strictEqual(btc.pinKey, 'm:BTC-USD');
+    const xrp = c.indices[0].items[4];
+    assert.strictEqual(xrp.level.text, '$0.5231');
+    assert.strictEqual(xrp.change.text, '+$0.0231');
+  });
+
+  it('coin rows show their pinned state and inline errors; loading until coins arrive', () => {
+    const coins = [
+      { index: COINS[0], quote: quote(COINS[0].symbol, 100, 100, 'USD') },
+      { index: COINS[1], error: 'HTTP 429' },
+    ];
+    const withPin = buildSnapshot([doge], { quotes: new Map(), quoteErrors: new Map(), indices: [], coins, lastUpdated: NOW }, DEFAULT_SETTINGS, false, [{ kind: 'market', symbol: 'BTC-USD' }]);
+    const c = buildPanelModel(withPin, { view: 'crypto' });
+    assert.strictEqual(c.indices[0].items[0].pinned, true);
+    assert.strictEqual(c.indices[0].items[0].change.text, '$0.00');
+    assert.strictEqual(c.indices[0].items[1].pinned, false);
+    assert.strictEqual(c.indices[0].items[1].error, 'HTTP 429');
+    assert.strictEqual(buildPanelModel(snapshot([doge]), { view: 'crypto' }).indicesLoading, true);
+  });
+
+  it('historyKey for a group ignores holdings of the other group', () => {
+    const base = snapshot([reliance, doge]);
+    const withMoreStocks = snapshot([reliance, aapl, doge]);
+    assert.strictEqual(historyKey(withMoreStocks, '30D', 'crypto'), historyKey(base, '30D', 'crypto'));
+    assert.notStrictEqual(historyKey(withMoreStocks, '30D', 'stocks'), historyKey(base, '30D', 'stocks'));
   });
 });
 

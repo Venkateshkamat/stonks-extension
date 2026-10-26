@@ -41,10 +41,16 @@ export class PinStore {
   private readonly changed = new Emitter<void>();
   readonly onDidChange: Event<void> = this.changed.event;
 
+  /**
+   * What this instance last wrote. The extension host can hand back a stale globalState value (an echo of an
+   * earlier write) for a few hundred ms after a newer write; reading our own last write avoids pins flickering back.
+   */
+  private latest?: string[];
+
   constructor(private readonly storage: KeyValueStore) {}
 
   list(): Pin[] {
-    const raw = this.storage.get<unknown>(PINS_KEY, []);
+    const raw = this.latest ?? this.storage.get<unknown>(PINS_KEY, []);
     if (!Array.isArray(raw)) return [];
     const seen = new Set<string>();
     const out: Pin[] = [];
@@ -78,7 +84,8 @@ export class PinStore {
   }
 
   private async save(pins: Pin[]): Promise<void> {
-    await this.storage.update(PINS_KEY, pins.map(pinKey));
+    this.latest = pins.map(pinKey);
+    await this.storage.update(PINS_KEY, this.latest);
     this.changed.fire();
   }
 }
@@ -91,7 +98,7 @@ export interface PinItem {
   label: string;
   /** Tooltip heading: "AAPL (US)" / "NIFTY 50". */
   name: string;
-  /** Currency of `price` for holdings (native); undefined for market rows. */
+  /** Currency of `price`: native for holdings, USD for coins; undefined for index levels. */
   currency?: Currency;
   /** Number locale for market levels. */
   locale: string;
@@ -143,6 +150,7 @@ export function buildPinItems(pins: readonly Pin[], rows: readonly HoldingRow[],
         key,
         label: def?.name ?? pin.symbol,
         name: def?.name ?? pin.symbol,
+        currency: def?.currency,
         locale: def?.region === 'India' ? 'en-IN' : 'en-US',
         ...fromQuote(res?.quote),
         error: res?.quote ? undefined : res?.error,

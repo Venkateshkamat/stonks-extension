@@ -1,5 +1,5 @@
 import { mapSettled, errorMessage } from '../util/async';
-import { FX_SYMBOL, DailyClose, IndexDef, INDICES, IntradayPoint, ProviderId, Quote, SymbolRef } from '../types';
+import { FX_SYMBOL, COINS, DailyClose, IndexDef, INDICES, IntradayPoint, ProviderId, Quote, SymbolRef } from '../types';
 import { normalizeSymbol } from '../symbols';
 import { FetchFn, HttpError } from './http';
 import { FinnhubProvider } from './finnhub';
@@ -130,10 +130,16 @@ export class MarketDataService {
     return this.getMarketQuotes(INDICES);
   }
 
-  /** Quotes for watch-list markets (indices; coins later) by Yahoo symbol, with per-symbol errors. */
+  /** Quotes for the major coins (Crypto view's Markets table). */
+  getCoinQuotes(): Promise<IndexResult[]> {
+    return this.getMarketQuotes(COINS);
+  }
+
+  /** Quotes for watch-list markets (indices and coins) by Yahoo symbol, with per-symbol errors. */
   async getMarketQuotes(defs: readonly IndexDef[]): Promise<IndexResult[]> {
     const settled = await mapSettled(defs, this.concurrency, (index) =>
-      this.cachedQuote(`i:${index.symbol}`, false, () => this.yahoo.getQuoteRaw(index.symbol)),
+      // Coins trade 24/7: their day change is the rolling 24h one, like crypto holdings.
+      this.cachedQuote(`i:${index.symbol}`, false, () => this.yahoo.getQuoteRaw(index.symbol, index.region === 'Crypto')),
     );
     return defs.map((index, i) => {
       const r = settled[i];

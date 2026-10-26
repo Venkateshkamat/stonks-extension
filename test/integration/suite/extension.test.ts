@@ -228,13 +228,56 @@ describe(`Stonks in ${process.env.STONKS_IT_TARGET ?? 'editor'} ${vscode.version
       assert.deepStrictEqual(d.errors, [], `webview reported errors: ${d.errors.join(' | ')}`);
       assert.strictEqual(d.ready, true);
       assert.strictEqual(d.chartLib, true, 'Chart.js did not load in the webview (typeof Chart === "undefined")');
-      assert.strictEqual(d.holdingRows, 3, 'the holdings table should show the 3 seeded holdings');
+      assert.strictEqual(api.panel.view, 'stocks', 'default view');
+      assert.strictEqual(d.view, 'stocks');
+      assert.strictEqual(d.viewButtons, 2, 'the Stocks | Crypto switcher should be rendered');
+      assert.strictEqual(d.holdingRows, 2, 'the Stocks view shows the 2 seeded stock holdings (AAPL, RELIANCE), not BTC');
       assert.strictEqual(d.currencyButtons, 2, 'the INR | USD toggle should be rendered in the header');
       assert.ok((d.pinButtons ?? 0) >= 3, `every holding row has a pin button, got ${d.pinButtons}`);
       assert.strictEqual(d.rangeButtons, 3, 'the 1D | 15D | 30D selector should be rendered above the chart');
       assert.strictEqual(api.panel.range, '30D', 'default range');
       assert.strictEqual(api.panel.currentChart?.range, '30D');
       assert.strictEqual(d.chartRendered, true, 'the chart was not rendered (history fetch failed or chart code threw)');
+    });
+
+    it('switching to the Crypto view shows only BTC, major-coin quotes and a crypto-only chart; the choice persists', async function () {
+      this.timeout(NETWORK_TIMEOUT + 10_000);
+      try {
+        await waitFor('index rows in the Stocks view', () => (api.panel.diagnostics.marketRows ?? 0) >= 6, NETWORK_TIMEOUT);
+        assert.ok(api.controller.snapshot.indices.length === 6 && api.controller.snapshot.coins.length === 0, 'the Stocks view loads indices only');
+
+        await api.panel.setView('crypto');
+        assert.strictEqual(api.panel.view, 'crypto');
+        await waitFor('webview shows the crypto view with 1 holding row', () => api.panel.diagnostics.view === 'crypto' && api.panel.diagnostics.holdingRows === 1, 20_000);
+        await waitFor('5 coin rows', () => api.panel.diagnostics.marketRows === 5, NETWORK_TIMEOUT);
+        const snap = api.controller.snapshot;
+        assert.strictEqual(snap.indices.length, 0, 'indices are no longer fetched in the Crypto view');
+        assert.ok(snap.coins.length === 5 && snap.coins.every((c) => c.quote && c.quote.price > 0), `coin quotes: ${snap.coins.map((c) => `${c.index.name}:${c.error ?? 'ok'}`).join(', ')}`);
+        const chart = await waitFor('crypto chart', () => (api.panel.currentChart?.key.includes('"crypto"') ? api.panel.currentChart : undefined), NETWORK_TIMEOUT);
+        assert.ok(chart.values.length > 0, `crypto chart has no points: ${chart.message ?? ''} ${chart.errors.join('; ')}`);
+        await waitFor('chart rendered in the crypto view', () => api.panel.diagnostics.chartRendered === true);
+        assert.deepStrictEqual(api.panel.diagnostics.errors, []);
+
+        // A coin can be pinned from the Markets table and shows a dollar price in the status bar.
+        await vscode.commands.executeCommand('stonks.pinTicker', 'm:ETH-USD');
+        const eth = await waitFor('ETH coin pin', () => api.statusBar.pins.find((p) => p.key === 'm:ETH-USD' && /^ETH \$[\d,]+\.\d{2} [+-]?\d+\.\d{2}%$/.test(p.text)), NETWORK_TIMEOUT);
+        assert.strictEqual(eth.command, 'stonks.openPortfolio');
+        await vscode.commands.executeCommand('stonks.unpinTicker', 'm:ETH-USD');
+        await waitFor('coin pin removed', () => api.statusBar.pins.length === 0);
+
+        // Closing and reopening the panel keeps the Crypto view.
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await waitFor('panel closed', () => !api.panel.isOpen);
+        assert.strictEqual(api.controller.snapshot.coins.length, 0, 'coins are only fetched while the Crypto view is open');
+        await vscode.commands.executeCommand('stonks.openPortfolio');
+        await waitFor('reopened on the crypto view', () => api.panel.diagnostics.ready && api.panel.diagnostics.view === 'crypto' && api.panel.diagnostics.holdingRows === 1, 20_000);
+        assert.strictEqual(api.panel.view, 'crypto');
+      } finally {
+        await api.panel.setView('stocks'); // restore the default so persisted state does not leak
+      }
+      await waitFor('webview back on stocks with 2 rows', () => api.panel.diagnostics.view === 'stocks' && api.panel.diagnostics.holdingRows === 2, 20_000);
+      assert.strictEqual(api.panel.view, 'stocks');
+      assert.deepStrictEqual(api.panel.diagnostics.errors, []);
     });
 
     it('switching the chart range to 1D and 15D loads the matching chart without webview errors, and persists the choice', async function () {

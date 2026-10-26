@@ -34,6 +34,18 @@ describe('pin keys', () => {
   });
 });
 
+describe('PinStore stale storage echo', () => {
+  it('keeps returning its own last write when the storage briefly hands back an older value', async () => {
+    const mem = new MemStore();
+    const s = new PinStore(mem);
+    await s.add(holdingPin('US', 'AAPL'));
+    await s.add({ kind: 'market', symbol: '^NSEI' });
+    await s.remove(holdingPin('US', 'AAPL'));
+    mem.data.set(PINS_KEY, ['h:US:AAPL', 'm:^NSEI']); // the extension host echoes an older value
+    assert.deepStrictEqual(s.list().map(pinKey), ['m:^NSEI']);
+  });
+});
+
 describe('PinStore', () => {
   it('adds in order, ignores duplicates, removes, and persists as a key array', async () => {
     const mem = new MemStore();

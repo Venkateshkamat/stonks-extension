@@ -5,8 +5,8 @@ import { MarketDataService } from '../market/marketData';
 import { PortfolioController } from '../portfolio/controller';
 import { holdingPin, parsePinKey, Pin, pinKey, PinStore } from '../portfolio/pins';
 import { HoldingsStore } from '../portfolio/store';
-import { nativeCurrency, normalizeSymbol, validateSymbol } from '../symbols';
-import { Currency, findMarketDef, Holding, INDICES, Market, Quote } from '../types';
+import { marketGroup, nativeCurrency, normalizeSymbol, PortfolioGroup, validateSymbol } from '../symbols';
+import { COINS, Currency, findMarketDef, Holding, INDICES, Market, Quote } from '../types';
 import { errorMessage } from '../util/async';
 import { parseBuyDate, parseQuantity, validateBuyDate, validateBuyPrice, validateQuantity, parsePositiveNumber, parseRefreshInterval, validateRefreshInterval } from '../validation';
 import { FinnhubKeyManager } from './apiKey';
@@ -39,7 +39,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
   const reg = vscode.commands.registerCommand;
   return [
     reg('stonks.openPortfolio', () => deps.openPortfolio()),
-    reg('stonks.addHolding', () => addHolding(deps)),
+    reg('stonks.addHolding', (group?: unknown) => addHolding(deps, group === 'stocks' || group === 'crypto' ? group : undefined)),
     reg('stonks.editHolding', (id?: unknown) => editHolding(deps, typeof id === 'string' ? id : undefined)),
     reg('stonks.removeHolding', (id?: unknown) => removeHolding(deps, typeof id === 'string' ? id : undefined)),
     reg('stonks.toggleHideAmounts', () => deps.controller.toggleHideAmounts()),
@@ -106,7 +106,7 @@ function pinTitle(p: Pin): string {
   return p.kind === 'holding' ? `${p.market}:${p.symbol}` : (findMarketDef(p.symbol)?.name ?? p.symbol);
 }
 
-/** Every pinnable ticker: one entry per distinct holding symbol, then the market rows (indices). */
+/** Every pinnable ticker: one entry per distinct holding symbol, then the market rows (indices and major coins). */
 function pinCandidates(deps: CommandDeps): Pin[] {
   const seen = new Set<string>();
   const out: Pin[] = [];
@@ -117,7 +117,7 @@ function pinCandidates(deps: CommandDeps): Pin[] {
       out.push(p);
     }
   }
-  for (const i of INDICES) out.push({ kind: 'market', symbol: i.symbol });
+  for (const i of [...INDICES, ...COINS]) out.push({ kind: 'market', symbol: i.symbol });
   return out;
 }
 
@@ -237,10 +237,19 @@ async function askBuyDate(initial?: string): Promise<{ date?: string } | undefin
   return v === undefined ? undefined : { date: parseBuyDate(v) };
 }
 
-export async function addHolding(deps: CommandDeps): Promise<void> {
-  const marketPick = await vscode.window.showQuickPick(MARKET_ITEMS, { title: 'Add Holding - Market', placeHolder: 'Select a market' });
-  if (!marketPick) return;
-  const market = marketPick.market;
+/**
+ * Add-holding flow. `group` narrows it to what the panel view shows: 'crypto' skips the market pick (CRYPTO),
+ * 'stocks' offers NSE / BSE / US only; omitted (command palette) offers every market.
+ */
+export async function addHolding(deps: CommandDeps, group?: PortfolioGroup): Promise<void> {
+  const choices = group ? MARKET_ITEMS.filter((m) => marketGroup(m.market) === group) : MARKET_ITEMS;
+  let market: Market;
+  if (choices.length === 1) market = choices[0].market;
+  else {
+    const marketPick = await vscode.window.showQuickPick(choices, { title: 'Add Holding - Market', placeHolder: 'Select a market' });
+    if (!marketPick) return;
+    market = marketPick.market;
+  }
 
   let symbol = '';
   let quote: Quote | undefined;

@@ -10,10 +10,12 @@ import { buildChartModel } from '../src/panel/chartModel';
 import { buildPanelModel, historyKey, PanelModel } from '../src/panel/model';
 import { buildSnapshot, FetchedData, HistorySeries } from '../src/portfolio/controller';
 import { holdingPin, Pin, pinKey } from '../src/portfolio/pins';
+import { PanelView, PANEL_VIEWS } from '../src/panel/views';
+import { marketGroup } from '../src/symbols';
 import { buildPinStatusModel, buildStatusBarModel, StatusBarModel } from '../src/statusBarModel';
 import { buildHistorySeries, buildIntradaySeries } from '../src/portfolio/history';
 import { DEFAULT_SETTINGS, Settings } from '../src/settings';
-import { ChartRange, CHART_RANGES, DailyClose, Holding, INDICES, IntradayPoint, Quote } from '../src/types';
+import { ChartRange, CHART_RANGES, COINS, DailyClose, Holding, INDICES, IntradayPoint, Quote } from '../src/types';
 
 const NOW = Date.UTC(2026, 9, 23, 10, 32, 11);
 const TODAY = '2026-10-23';
@@ -50,6 +52,14 @@ const INDEX_PRICES: Record<string, [number, number]> = {
   '^IXIC': [18420.75, 18510.4],
 };
 
+const COIN_PRICES: Record<string, [number, number]> = {
+  'BTC-USD': [67420.5, 66810],
+  'ETH-USD': [2612.34, 2655.1],
+  'SOL-USD': [172.88, 168.4],
+  'BNB-USD': [598.2, 597.65],
+  'XRP-USD': [0.5231, 0.5412],
+};
+
 function quote(symbol: string, price: number, prev: number, currency: 'INR' | 'USD'): Quote {
   const change = price - prev;
   return { symbol, price, prevClose: prev, change, changePercent: (change / prev) * 100, currency, source: 'yahoo', time: NOW };
@@ -69,6 +79,7 @@ function fetched(holdings: Holding[], extra: Partial<FetchedData> = {}): Fetched
       index,
       quote: quote(index.symbol, INDEX_PRICES[index.symbol][0], INDEX_PRICES[index.symbol][1], index.region === 'India' ? 'INR' : 'USD'),
     })),
+    coins: COINS.map((index) => ({ index, quote: quote(index.symbol, COIN_PRICES[index.symbol][0], COIN_PRICES[index.symbol][1], 'USD') })),
     lastUpdated: NOW,
     ...extra,
   };
@@ -172,40 +183,56 @@ interface StatusBarMock {
   pinItems: Record<string, StatusBarModel>;
 }
 
+interface ViewData {
+  model: PanelModel;
+  /** Per range: null = still loading; undefined/absent = no chart (empty state). */
+  charts: ChartByRange;
+}
+
 interface Variant {
   statusBar: StatusBarMock;
-  model: PanelModel;
-  /** Per range: null = still loading; undefined/absent = no chart (empty state). `chart` is the 30D one. */
-  charts: ChartByRange;
-  chart: ReturnType<typeof buildChartModel> | null | undefined;
+  /** One entry per panel view (the Stocks / Crypto switcher). */
+  views: Record<PanelView, ViewData>;
 }
 
 function variant(holdings: Holding[], settings: Partial<Settings>, opts: { data?: Partial<FetchedData>; loading?: boolean; errors?: string[] } = {}): Variant {
   const st: Settings = { ...DEFAULT_SETTINGS, ...settings };
   const data = fetched(holdings, opts.data);
-  data.pinnedMarkets = data.indices;
+  data.pinnedMarkets = [...data.indices, ...(data.coins ?? [])];
   const candidates: Pin[] = [holdingPin('NSE', 'RELIANCE'), holdingPin('CRYPTO', 'BTC'), { kind: 'market', symbol: '^NSEI' }];
   const initial = candidates.filter(
     (p) => p.kind === 'market' || holdings.some((h) => pinKey(holdingPin(h.market, h.symbol)) === pinKey(p)),
   );
   const snap = buildSnapshot(holdings, data, st, opts.loading ?? false, initial);
-  const model = buildPanelModel(snap, { formatTime: () => '10:32:11 AM' });
-  const everything: Pin[] = [...holdings.map((h) => holdingPin(h.market, h.symbol)), ...INDICES.map((i): Pin => ({ kind: 'market', symbol: i.symbol }))];
+  const everything: Pin[] = [
+    ...holdings.map((h) => holdingPin(h.market, h.symbol)),
+    ...[...INDICES, ...COINS].map((i): Pin => ({ kind: 'market', symbol: i.symbol })),
+  ];
   const pinItems: Record<string, StatusBarModel> = {};
   for (const item of buildSnapshot(holdings, data, st, false, everything).pins) pinItems[item.key] = buildPinStatusModel(item);
   const statusBar: StatusBarMock = { main: buildStatusBarModel(snap), pinned: initial.map(pinKey), pinItems };
-  if (holdings.length === 0) return { statusBar, model, charts: {}, chart: undefined };
-  if (opts.loading) return { statusBar, model, charts: { '1D': null, '15D': null, '30D': null }, chart: null };
-  const charts: ChartByRange = {};
-  for (const r of CHART_RANGES) charts[r] = buildChartModel(history(holdings, st, r, opts.errors), historyKey(snap, r), { timeZone: 'Asia/Kolkata' });
-  return { statusBar, model, charts, chart: charts['30D'] };
+
+  const views = {} as Record<PanelView, ViewData>;
+  for (const view of PANEL_VIEWS) {
+    const model = buildPanelModel(snap, { formatTime: () => '10:32:11 AM', view });
+    const inView = holdings.filter((h) => marketGroup(h.market) === view);
+    if (inView.length === 0) views[view] = { model, charts: {} };
+    else if (opts.loading) views[view] = { model, charts: { '1D': null, '15D': null, '30D': null } };
+    else {
+      const charts: ChartByRange = {};
+      for (const r of CHART_RANGES) charts[r] = buildChartModel(history(inView, st, r, opts.errors), historyKey(snap, r, view), { timeZone: 'Asia/Kolkata' });
+      views[view] = { model, charts };
+    }
+  }
+  return { statusBar, views };
 }
 
 const errorData = (): Partial<FetchedData> => {
   const base = fetched(HOLDINGS);
   base.quoteErrors.set('h6', 'Yahoo Finance: HTTP 429 (rate limited)');
   base.indices[1] = { index: INDICES[1], error: 'No data returned for ^BSESN' };
-  return { quotes: base.quotes, quoteErrors: base.quoteErrors, indices: base.indices, finnhubIssue: 'Finnhub rate limit reached; using Yahoo Finance instead.' };
+  base.coins![1] = { index: COINS[1], error: 'HTTP 429 (rate limited)' };
+  return { quotes: base.quotes, quoteErrors: base.quoteErrors, indices: base.indices, coins: base.coins, finnhubIssue: 'Finnhub rate limit reached; using Yahoo Finance instead.' };
 };
 
 const variants: Record<string, Variant> = {
@@ -213,11 +240,11 @@ const variants: Record<string, Variant> = {
   hidden: variant(HOLDINGS, { hideAmounts: true, baseCurrency: 'INR' }),
   usd: variant(HOLDINGS, { hideAmounts: false, baseCurrency: 'USD' }),
   errors: variant(HOLDINGS, { hideAmounts: false, baseCurrency: 'INR' }, { data: errorData(), errors: ['US:TSLA: HTTP 429'] }),
-  loading: variant(HOLDINGS, {}, { loading: true, data: { quotes: new Map(), lastUpdated: undefined, indices: [] } }),
+  loading: variant(HOLDINGS, {}, { loading: true, data: { quotes: new Map(), lastUpdated: undefined, indices: [], coins: [] } }),
   empty: variant([], {}),
 };
 
 const out = `/* GENERATED by dev/generate-preview-data.ts (npm run preview:data). Do not edit. */\nwindow.STONKS_MOCK = ${JSON.stringify(variants, null, 1)};\n`;
 const target = path.join(__dirname, '..', '..', 'dev', 'preview-data.js');
 fs.writeFileSync(target, out);
-console.log(`wrote ${target} (${out.length} bytes, variants: ${Object.keys(variants).join(', ')})`);
+console.log(`wrote ${target} (${out.length} bytes, views: ${PANEL_VIEWS.join(', ')}, variants: ${Object.keys(variants).join(', ')})`);

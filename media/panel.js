@@ -28,6 +28,9 @@
       rangeButtons: elRange.querySelectorAll('.seg-btn').length,
       holdingRows: elHoldings.querySelectorAll('tbody tr:not(.error-row)').length,
       currencyButtons: elTop.querySelectorAll('.currency-toggle .seg-btn').length,
+      viewButtons: elViews.querySelectorAll('.seg-btn').length,
+      view: model ? model.view : '',
+      marketRows: elIndices.querySelectorAll('tbody tr:not(.error-row)').length,
     });
   }
   var app = document.getElementById('app');
@@ -119,6 +122,8 @@
   function act(action, id) {
     var msg = { type: 'action', action: action };
     if (id) msg.id = id;
+    // "Add holding" follows the view: Crypto pre-selects the CRYPTO market, Stocks offers NSE / BSE / US.
+    if (action === 'add' && model && (model.view === 'stocks' || model.view === 'crypto')) msg.group = model.view;
     vscode.postMessage(msg);
   }
 
@@ -130,6 +135,7 @@
   // ---------- skeleton ----------
 
   var elTop = h('div', { class: 'topbar' });
+  var elViews = h('div', { class: 'view-switch' });
   var elStatus = h('div');
   var elWarnings = h('ul', { class: 'warnings' });
   var elHoldings = h('section');
@@ -149,6 +155,7 @@
   elChartSection.appendChild(chartErrors);
 
   app.appendChild(elTop);
+  app.appendChild(elViews);
   app.appendChild(elStatus);
   app.appendChild(elWarnings);
   app.appendChild(elHoldings);
@@ -189,6 +196,17 @@
     elTop.replaceChildren(h('div', null, h('h1', { text: 'Stonks' }), meta), toolbar);
   }
 
+  var VIEW_OPTIONS = [
+    { value: 'stocks', label: 'Stocks', title: 'NSE, BSE and US holdings' },
+    { value: 'crypto', label: 'Crypto', title: 'Crypto holdings' },
+  ];
+
+  function renderViews() {
+    elViews.replaceChildren(
+      segmented('View', VIEW_OPTIONS, model.view, function (v) { vscode.postMessage({ type: 'setView', view: v }); }, 'view-toggle'),
+    );
+  }
+
   function renderStatus() {
     var kids = [];
     if (model.empty) {
@@ -220,13 +238,19 @@
 
   function renderHoldings() {
     if (model.empty) {
+      var crypto = model.view === 'crypto';
       elHoldings.replaceChildren(
         h(
           'div',
           { class: 'empty' },
-          h('div', { class: 'title', text: 'No holdings yet' }),
-          h('div', { class: 'hint', text: 'Track your stocks and crypto: add a holding to see your profit and loss.' }),
-          h('button', { class: 'btn large', type: 'button', onclick: function () { act('add'); } }, icon('plus'), 'Add your first holding'),
+          h('div', { class: 'title', text: crypto ? 'No crypto holdings yet' : 'No stock holdings yet' }),
+          h('div', {
+            class: 'hint',
+            text: crypto
+              ? 'Track coins like BTC and ETH: add a holding to see your profit and loss.'
+              : 'Track NSE, BSE and US stocks: add a holding to see your profit and loss.',
+          }),
+          h('button', { class: 'btn large', type: 'button', onclick: function () { act('add'); } }, icon('plus'), crypto ? 'Add your first crypto holding' : 'Add your first stock holding'),
         ),
       );
       return;
@@ -268,9 +292,10 @@
   }
 
   function renderIndices() {
-    var kids = [h('h2', { text: 'Markets' })];
+    var kids = [h('h2', { text: model.marketsTitle })];
     if (model.indices.length === 0) {
-      kids.push(h('div', { class: 'status-msg', text: model.indicesLoading ? 'Loading indices...' : 'No index data.' }));
+      var what = model.view === 'crypto' ? 'coins' : 'indices';
+      kids.push(h('div', { class: 'status-msg', text: model.indicesLoading ? 'Loading ' + what + '...' : 'No ' + what + ' data.' }));
     } else {
       var groups = h('div', { class: 'index-groups' });
       model.indices.forEach(function (g) {
@@ -295,7 +320,7 @@
           h(
             'div',
             null,
-            h('h3', { text: g.region }),
+            g.region === 'Crypto' ? null : h('h3', { text: g.region }),
             h(
               'div',
               { class: 'table-wrap' },
@@ -308,8 +333,8 @@
                   h(
                     'tr',
                     null,
-                    h('th', { text: 'Index' }),
-                    h('th', { class: 'right', text: 'Level' }),
+                    h('th', { text: model.marketsNameLabel }),
+                    h('th', { class: 'right', text: model.marketsLevelLabel }),
                     h('th', { class: 'right', text: 'Change' }),
                     h('th', { class: 'right', text: 'Change %' }),
                     h('th', { scope: 'col', 'aria-label': 'Pin to status bar' }),
@@ -328,6 +353,7 @@
 
   function render() {
     renderTop();
+    renderViews();
     renderStatus();
     renderHoldings();
     renderIndices();
@@ -492,6 +518,7 @@
     if (msg.type === 'state') {
       model = msg.model;
       render();
+      reportDiag();
     } else if (msg.type === 'history') {
       chartModel = msg.chart;
       renderChart();
