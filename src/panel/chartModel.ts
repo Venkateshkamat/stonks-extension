@@ -27,9 +27,10 @@ export interface ChartModel {
   errors: string[];
 }
 
+/** Created on first use: building an Intl.DateTimeFormat costs several milliseconds, which must not be paid at extension startup. */
 function dateFmt(opts: Intl.DateTimeFormatOptions): (date: string) => string {
-  const f = new Intl.DateTimeFormat('en-GB', { ...opts, timeZone: 'UTC' });
-  return (date) => f.format(new Date(`${date}T00:00:00Z`));
+  let f: Intl.DateTimeFormat | undefined;
+  return (date) => (f ??= new Intl.DateTimeFormat('en-GB', { ...opts, timeZone: 'UTC' })).format(new Date(`${date}T00:00:00Z`));
 }
 const shortDate = dateFmt({ day: 'numeric', month: 'short' });
 const longDate = dateFmt({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
